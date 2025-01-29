@@ -14,7 +14,7 @@ def extract_last_period_autocorrelation(x,y,z,vx,vy,vz,t,min_duration_period):
     z_auto = autocor(zn)
     autocorr = x_auto+y_auto+z_auto
     index_lim = np.argmax(np.array(t) > min_duration_period)
-    autocorr[:index_lim]=0
+    autocorr[:index_lim]=autocorr[index_lim]
     autocorr=autocorr/np.max(np.abs(autocorr))
  
     peaks, _ = find_peaks(autocorr)
