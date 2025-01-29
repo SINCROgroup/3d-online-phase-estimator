@@ -47,8 +47,8 @@ ref_frame_point_3 = np.array(data[col_names_ref_frame_point_3].iloc[first_idx_wi
 # ------------------------------------------------
 estimator_live = Phase_Estimation(
     step_time= step_time,
-    range_phase_computer_pre  = look_behind_pcent,
-    range_phase_computer_post = look_ahead_pcent,
+    look_behind_pcent= look_behind_pcent,
+    look_ahead_pcent= look_ahead_pcent,
     wait_time                 = wait_time,
     listening_time            = listening_time,
     min_duration_period       = min_duration_period,

@@ -1,12 +1,12 @@
 import numpy as np
-import fun_first_period_estimation 
+from fun_first_period_estimation import extract_last_period_autocorrelation
 from scipy.signal import find_peaks
 
 class Phase_Estimation:
     def __init__(self,
                  step_time                 = 0.01,
-                 range_phase_computer_pre  = 0,
-                 range_phase_computer_post = 25,
+                 look_behind_pcent  = 0,
+                 look_ahead_pcent = 25,
                  wait_time                 = 5,
                  listening_time            = 15,
                  min_duration_period       = None,
@@ -28,8 +28,8 @@ class Phase_Estimation:
         self.wait_time                             = wait_time         # initial waiting time interval [s]
         self.listening_time                        = listening_time        # time interval in witch to estimate the first period [s]
         self.min_duration_period                   = 1         # minimum time duration of periods [s]
-        self.percentage_range_phase_computer_post  = range_phase_computer_post        # % of the last completed period before the last nearest point on which estimate the new phase
-        self.percentage_range_phase_computer_pre   = range_phase_computer_pre         # % of the last completed period after the last nearest point on which estimate the new phase
+        self.look_ahead_pcent  = look_ahead_pcent        # % of the last completed period before the last nearest point on which estimate the new phase
+        self.look_behind_pcent   = look_behind_pcent         # % of the last completed period after the last nearest point on which estimate the new phase
         self.diff_len_new_ref                      = 30        # difference in length of the new reference (vector length) compared to the old one, expressed as a percentage of the old length, is accepted.
 
         self.max_length_vec_period  = 1000
@@ -41,14 +41,14 @@ class Phase_Estimation:
         self.new_period             = np.zeros((self.max_length_vec_period, 6))
 
         # parameter for the zero phase estimation 
-        self.reference              = None      
-        self.point_1                = None      
-        self.point_2                = None 
-        self.point_3                = None  
+        self.reference = None
+        self.point_1   = None
+        self.point_2   = None
+        self.point_3   = None
 
         self.counter       = 0
         self.min_index_pre = 0
-        self.position_prev  = 0
+        self.position_prev = [0, 0, 0]
 
         self.len_last_period_discarded = 0
         self.range_post                = 0
@@ -72,29 +72,33 @@ class Phase_Estimation:
         self.time_vec.append(curr_time - self.initial_time)
 
         if  self.time_vec[-1] > self.wait_time:
-            self.x_vec.append(position[0])
+            self.x_vec.append(position[0])         # TODO should be a numpy matrix
             self.y_vec.append(position[1])
             self.z_vec.append(position[2])
-            if len(self.x_vec) > 1 :
-                self.step_time = self.time_vec[-1] - self.time_vec[-2]
-                self.vel_x_vec.append((position[0] - self.x_vec[-2]) / (self.step_time))
-                self.vel_y_vec.append((position[1] - self.y_vec[-2]) / (self.step_time))
-                self.vel_z_vec.append((position[2] - self.z_vec[-2]) / (self.step_time))
-            else:
-                self.vel_x_vec.append((position[0] - self.position_prev[0]) / (self.step_time))
-                self.vel_y_vec.append((position[1] - self.position_prev[1]) / (self.step_time))
-                self.vel_z_vec.append((position[2] - self.position_prev[2]) / (self.step_time))
-        else:
-            self.position_prev = position
+            self.step_time = self.time_vec[-1] - self.time_vec[-2]
+            self.vel_x_vec.append((position[0] - self.position_prev[0]) / self.step_time)
+            self.vel_y_vec.append((position[1] - self.position_prev[1]) / self.step_time)
+            self.vel_z_vec.append((position[2] - self.position_prev[2]) / self.step_time)
+
+        self.position_prev = position
                 
-        if self.is_first_period_estimated == False: # if the first completed period has not yet been estimated
+        if not self.is_first_period_estimated:
             if self.time_vec[-1] > self.wait_time + self.listening_time:
-                self.last_completed_period=fun_first_period_estimation.extract_last_period_autocorrelation(self.x_vec, self.y_vec, self.z_vec, self.vel_x_vec, self.vel_y_vec, self.vel_z_vec, self.time_vec, self.min_duration_period)
-                self.is_first_period_estimated=True
-                self.range_post = int(len(self.last_completed_period)*self.percentage_range_phase_computer_post/100)
+                self.last_completed_period = extract_last_period_autocorrelation(
+                    x_vec = self.x_vec,
+                    y_vec = self.y_vec,
+                    z_vec = self.z_vec,
+                    vel_x_vec = self.vel_x_vec,
+                    vel_y_vec = self.vel_y_vec,
+                    vel_z_vec = self.vel_z_vec,
+                    time_vec = self.time_vec,
+                    min_duration_period = self.min_duration_period)
+
+                self.is_first_period_estimated = True
+                self.range_post = int(len(self.last_completed_period) * self.look_ahead_pcent / 100)   # range_post is the number of points after the last nearest point on which estimate the new phase
                 if self.range_post == 0:
                     self.range_post = 1
-                self.range_pre = int(len(self.last_completed_period)*self.percentage_range_phase_computer_pre/100)
+                self.range_pre = int(len(self.last_completed_period) * self.look_behind_pcent / 100)
                 if self.range_pre == 0:
                     self.range_pre = 1
                 if self.reference is not None:
@@ -121,19 +125,19 @@ class Phase_Estimation:
         if self.phase[1]-self.phase[0] < -self.epsilon:
             if abs(self.counter-len(self.last_completed_period)) < len(self.last_completed_period)*self.diff_len_new_ref/100: # Ensure that the difference in length between the new period and the previous one is not greater than the range set by the user.
                 self.last_completed_period = self.new_period[0:self.counter,:]
-                self.range_post = int(len(self.last_completed_period)*self.percentage_range_phase_computer_post/100)
+                self.range_post = int(len(self.last_completed_period) * self.look_ahead_pcent / 100)
                 if self.range_post==0:
                     self.range_post=1
-                self.range_pre = int(len(self.last_completed_period)*self.percentage_range_phase_computer_pre/100)
+                self.range_pre = int(len(self.last_completed_period) * self.look_behind_pcent / 100)
                 if self.range_pre == 0:
                     self.range_pre = 1
 
             elif abs(self.counter-self.len_last_period_discarded) < self.len_last_period_discarded*self.diff_len_new_ref/100:
                 self.last_completed_period = self.new_period[0:self.counter,:]
-                self.range_post = int(len(self.last_completed_period)*self.percentage_range_phase_computer_post/100)
+                self.range_post = int(len(self.last_completed_period) * self.look_ahead_pcent / 100)
                 if self.range_post==0:
                     self.range_post=1
-                self.range_pre = int(len(self.last_completed_period)*self.percentage_range_phase_computer_pre/100)
+                self.range_pre = int(len(self.last_completed_period) * self.look_behind_pcent / 100)
                 if self.range_pre == 0:
                     self.range_pre = 1
                 self.len_last_period_discarded = 0
