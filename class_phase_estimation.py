@@ -1,4 +1,3 @@
-import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import hilbert
 from sklearn.decomposition import PCA
