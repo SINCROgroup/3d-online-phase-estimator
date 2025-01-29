@@ -1,10 +1,10 @@
 import numpy as np
-from scipy.signal import find_peaks
-from scipy.signal import detrend
+from scipy.signal import detrend, find_peaks
+
 
 threshold_acceptable_peaks_wrt_maximum_pcent = 20    # Acceptance range of autocorrelation peaks defined as a percentage of the maximum autocorrelation value.
 
-def extract_last_period_autocorrelation(x_vec, y_vec, z_vec, vel_x_vec, vel_y_vec, vel_z_vec, time_vec, min_duration_period):
+def compute_signal_period_autocorrelation(x_vec, y_vec, z_vec, vel_x_vec, vel_y_vec, vel_z_vec, time_vec, min_duration_period) -> np.ndarray:
     xn = detrend(x_vec)
     yn = detrend(y_vec)
     zn = detrend(z_vec)
@@ -13,31 +13,31 @@ def extract_last_period_autocorrelation(x_vec, y_vec, z_vec, vel_x_vec, vel_y_ve
     autocorr_vec_z = compute_autocorr_vec(zn)
     autocorr_vec_tot = autocorr_vec_x + autocorr_vec_y + autocorr_vec_z
 
-    idx_lim = np.argmax(np.array(time_vec) > min_duration_period)
-    autocorr_vec_tot[:idx_lim] = autocorr_vec_tot[idx_lim]
+    idx_min_duration = np.argmax(np.array(time_vec) > min_duration_period)
+    autocorr_vec_tot[:idx_min_duration] = autocorr_vec_tot[idx_min_duration]
 
     autocorr_vec_tot = autocorr_vec_tot/np.max(np.abs(autocorr_vec_tot))
  
     peaks, _ = find_peaks(autocorr_vec_tot)
-    peaks_values = autocorr_vec_tot[peaks[np.where(peaks > idx_lim)]]
+    peaks_values = autocorr_vec_tot[peaks[np.where(peaks > idx_min_duration)]]
     lower_bound_acceptable_peaks_values = max(peaks_values) - (max(peaks_values) * threshold_acceptable_peaks_wrt_maximum_pcent / 100)
     idxs_possible_period = np.where(peaks_values > lower_bound_acceptable_peaks_values)
     start_idx = 0
     end_idx = peaks[idxs_possible_period[0]][0]
 
-    x_last_period  = x_vec[start_idx:end_idx]
-    y_last_period  = y_vec[start_idx:end_idx]
-    z_last_period  = z_vec[start_idx:end_idx]
-    vx_last_period = vel_x_vec[start_idx:end_idx]
-    vy_last_period = vel_y_vec[start_idx:end_idx]
-    vz_last_period = vel_z_vec[start_idx:end_idx]
+    x_period  = x_vec[start_idx:end_idx]
+    y_period  = y_vec[start_idx:end_idx]
+    z_period  = z_vec[start_idx:end_idx]
+    vel_x_period = vel_x_vec[start_idx:end_idx]
+    vel_y_period = vel_y_vec[start_idx:end_idx]
+    vel_z_period = vel_z_vec[start_idx:end_idx]
 
-    first_period = np.column_stack((x_last_period, y_last_period, z_last_period, vx_last_period, vy_last_period, vz_last_period))
+    signal_period = np.column_stack((x_period, y_period, z_period, vel_x_period, vel_y_period, vel_z_period))
 
-    return first_period
+    return signal_period
 
 
-def compute_autocorr_vec(signal):
+def compute_autocorr_vec(signal: np.ndarray) -> np.ndarray:
     max_lag  = len(signal)//2
     autocorr_vec = np.zeros(max_lag + 1)
     

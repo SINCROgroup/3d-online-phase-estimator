@@ -3,7 +3,7 @@ import pandas as pd
 from scipy.signal import hilbert
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
-from class_phase_estimation import Phase_Estimation
+from Phase_Estimation import Phase_Estimation
 
 
 # Parameters
@@ -15,7 +15,7 @@ min_duration_period = 0     # min first period interval [s]
 look_behind_pcent   = 0     # % of the last completed period before the last nearest point on which estimate the new phase
 look_ahead_pcent    = 25    # % of the last completed period after the last nearest point on which estimate the new phase
 file_path_signal    = r"data\spiral_mc_1.csv"
-file_path_ref_traj = r"data\spiral_ref.csv"
+file_path_ref_traj  = r"data\spiral_ref.csv"
 
 col_names_traj              = ['TX.3', 'TY.3', 'TZ.3']
 col_names_ref_frame_point_1 = ['TX', 'TY', 'TZ']        # belly
@@ -46,16 +46,16 @@ ref_frame_point_3 = np.array(data[col_names_ref_frame_point_3].iloc[first_idx_wi
 # Online estimator
 # ------------------------------------------------
 estimator_live = Phase_Estimation(
-    step_time= step_time,
-    look_behind_pcent= look_behind_pcent,
-    look_ahead_pcent= look_ahead_pcent,
-    wait_time                 = wait_time,
-    listening_time            = listening_time,
-    min_duration_period       = min_duration_period,
-    reference                 = df_ref,
-    point_1                   = ref_frame_point_3,
-    point_2                   = ref_frame_point_2,
-    point_3                   = ref_frame_point_1
+    step_time           = step_time,
+    look_behind_pcent   = look_behind_pcent,
+    look_ahead_pcent    = look_ahead_pcent,
+    wait_time           = wait_time,
+    listening_time      = listening_time,
+    min_duration_period = min_duration_period,
+    reference           = df_ref,
+    ref_frame_point_1   = ref_frame_point_3,
+    ref_frame_point_2   = ref_frame_point_2,
+    ref_frame_point_3   = ref_frame_point_1
 )
 phase_online = [None] * len(trajectory[:, 0])
 for j in range(len(trajectory[:,0])-1):
