@@ -2,7 +2,7 @@ import numpy as np
 from scipy.signal import find_peaks
 from scipy.signal import detrend
 
-threshold = 20    # Acceptance range of autocorrelation peaks defined as a percentage of the maximum autocorrelation value.
+threshold_acceptable_peaks_wrt_maximum_pcent = 20    # Acceptance range of autocorrelation peaks defined as a percentage of the maximum autocorrelation value.
 
 def extract_last_period_autocorrelation(x_vec, y_vec, z_vec, vel_x_vec, vel_y_vec, vel_z_vec, time_vec, min_duration_period):
     xn = detrend(x_vec)
@@ -20,8 +20,8 @@ def extract_last_period_autocorrelation(x_vec, y_vec, z_vec, vel_x_vec, vel_y_ve
  
     peaks, _ = find_peaks(autocorr_vec_tot)
     peaks_values = autocorr_vec_tot[peaks[np.where(peaks > idx_lim)]]
-    peaks_value_limit = max(peaks_values) - (max(peaks_values) * threshold / 100)
-    idxs_possible_period = np.where(peaks_values > peaks_value_limit)
+    lower_bound_acceptable_peaks_values = max(peaks_values) - (max(peaks_values) * threshold_acceptable_peaks_wrt_maximum_pcent / 100)
+    idxs_possible_period = np.where(peaks_values > lower_bound_acceptable_peaks_values)
     start_idx = 0
     end_idx = peaks[idxs_possible_period[0]][0]
 
