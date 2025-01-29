@@ -6,12 +6,12 @@ import matplotlib.pyplot as plt
 from class_phase_estimation import Phase_estimation
 
 ## Set parameters
-ts                      = 0.01  # step time [s]
-wait_time               = 1     # time interval before start phase computation [s]
-listening_time          = 10    # max first period interval [s]
-min_duration_period     = 0     # min first period interval [s] 
-percentage_pre          = 0     # % of the last completed period before the last nearest point on which estimate the new phase
-percentage_post         = 25    # % of the last completed period after the last nearest point on which estimate the new phase
+ts                  = 0.01  # step time [s]
+wait_time           = 1     # time interval before start phase computation [s]
+listening_time      = 10    # max first period interval [s]
+min_duration_period = 0     # min first period interval [s] 
+percentage_pre      = 0     # % of the last completed period before the last nearest point on which estimate the new phase
+percentage_post     = 25    # % of the last completed period after the last nearest point on which estimate the new phase
 file_path =r"C:\Users\totos\OneDrive - Università di Napoli Federico II\SHARESPACE\Experiments\experiments_2024-10-10\data\spiral_mc_1.csv"  #path signal
 ref_path =r"C:\Users\totos\OneDrive - Università di Napoli Federico II\SHARESPACE\Experiments\experiments_2024-10-10\data\spiral_ref.csv"    #path reference 
 
