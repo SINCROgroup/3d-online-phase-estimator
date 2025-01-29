@@ -25,7 +25,7 @@ col_names_ref_frame_point_3 = ['TX.1', 'TY.1', 'TZ.1']  # left chest
 # Load data
 # ------------------------------------------------
 df_ref = pd.read_csv(file_path_ref_traj)
-df_ref = np.array([df_ref['x_vec'], df_ref['y_vec'], df_ref['z_vec']]).T
+df_ref = np.array([df_ref['x'], df_ref['y'], df_ref['z']]).T
 data   = pd.read_csv(file_path_signal, skiprows=[0, 1, 2] + list(range(4, 40)), low_memory=False)
 
 df_trajectory = data[col_names_traj].copy()

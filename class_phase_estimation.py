@@ -20,7 +20,7 @@ class Phase_Estimation:
         self.z_vec  = []
         self.vel_x_vec = []
         self.vel_y_vec = []
-        self.vel_y_vec = []
+        self.vel_z_vec = []
         self.time_vec  = []
 
         self.step_time                             = step_time      # [s]
@@ -77,19 +77,19 @@ class Phase_Estimation:
             self.z_vec.append(position[2])
             if len(self.x_vec) > 1 :
                 self.step_time = self.time_vec[-1] - self.time_vec[-2]
-                self.vel_x_vec.append((self.x_vec[-1] - self.x_vec[-2]) / self.step_time)
-                self.vel_y_vec.append((self.y_vec[-1] - self.y_vec[-2]) / self.step_time)
-                self.vel_y_vec.append((self.z_vec[-1] - self.z_vec[-2]) / self.step_time)
+                self.vel_x_vec.append((position[0] - self.x_vec[-2]) / (self.step_time))
+                self.vel_y_vec.append((position[1] - self.y_vec[-2]) / (self.step_time))
+                self.vel_z_vec.append((position[2] - self.z_vec[-2]) / (self.step_time))
             else:
-                self.vel_x_vec.append((self.x_vec[-1] - self.position_prev[0]) / self.step_time)
-                self.vel_y_vec.append((self.y_vec[-1] - self.position_prev[1]) / self.step_time)
-                self.vel_y_vec.append((self.z_vec[-1] - self.position_prev[2]) / self.step_time)
+                self.vel_x_vec.append((position[0] - self.position_prev[0]) / (self.step_time))
+                self.vel_y_vec.append((position[1] - self.position_prev[1]) / (self.step_time))
+                self.vel_z_vec.append((position[2] - self.position_prev[2]) / (self.step_time))
         else:
             self.position_prev = position
                 
         if self.is_first_period_estimated == False: # if the first completed period has not yet been estimated
             if self.time_vec[-1] > self.wait_time + self.listening_time:
-                self.last_completed_period=fun_first_period_estimation.extract_last_period_autocorrelation(self.x_vec, self.y_vec, self.z_vec, self.vel_x_vec, self.vel_y_vec, self.vel_y_vec, self.time_vec, self.min_duration_period)
+                self.last_completed_period=fun_first_period_estimation.extract_last_period_autocorrelation(self.x_vec, self.y_vec, self.z_vec, self.vel_x_vec, self.vel_y_vec, self.vel_z_vec, self.time_vec, self.min_duration_period)
                 self.is_first_period_estimated=True
                 self.range_post = int(len(self.last_completed_period)*self.percentage_range_phase_computer_post/100)
                 if self.range_post == 0:
@@ -100,12 +100,12 @@ class Phase_Estimation:
                 if self.reference is not None:
                     self.compute_phase_offset()
                 for i in range(len(self.last_completed_period), len(self.x_vec) - 1):
-                    p = np.array([self.x_vec[i], self.y_vec[i], self.z_vec[i], self.vel_x_vec[i], self.vel_y_vec[i], self.vel_y_vec[i]])
+                    p = np.array([self.x_vec[i], self.y_vec[i], self.z_vec[i], self.vel_x_vec[i], self.vel_y_vec[i], self.vel_z_vec[i]])
                     self.phase_computer(p)
                     self.period_estimation(p)
 
         if len(self.x_vec) > 0:
-            p = np.array([self.x_vec[-1], self.y_vec[-1], self.z_vec[-1], self.vel_x_vec[-1], self.vel_y_vec[-1], self.vel_y_vec[-1]])
+            p = np.array([self.x_vec[-1], self.y_vec[-1], self.z_vec[-1], self.vel_x_vec[-1], self.vel_y_vec[-1], self.vel_z_vec[-1]])
         else:
             p = np.array([0,0,0,0,0,0])
 
