@@ -2,27 +2,29 @@ import numpy as np
 import fun_first_period_estimation 
 from scipy.signal import find_peaks
 
-class Phase_estimation:
-    def __init__(self, ts=0.01,
-                 range_phase_computer_pre = 0,
+class Phase_Estimation:
+    def __init__(self,
+                 step_time                 = 0.01,
+                 range_phase_computer_pre  = 0,
                  range_phase_computer_post = 25,
-                 wait_time = 5,
-                 listening_time = 15,
-                 min_duration_period = None,
-                 reference = None,
-                 point_1 = None,
-                 point_2 = None,
-                 point_3 = None):
-        self.x  = []
-        self.y  = []
-        self.z  = []
-        self.vx = []
-        self.vy = []
-        self.vz = []
-        self.t  = []
+                 wait_time                 = 5,
+                 listening_time            = 15,
+                 min_duration_period       = None,
+                 reference                 = None,
+                 point_1                   = None,
+                 point_2                   = None,
+                 point_3                   = None):
+        
+        self.x_vec  = []
+        self.y_vec  = []
+        self.z_vec  = []
+        self.vel_x_vec = []
+        self.vel_y_vec = []
+        self.vel_y_vec = []
+        self.time_vec  = []
 
-        self.ts                                    = ts      # step time [s]
-        self.init_t                                = 0         # start time instant of fase computation [s]
+        self.step_time                             = step_time      # [s]
+        self.initial_time                                = 0         # start time instant of fase computation [s]
         self.wait_time                             = wait_time         # initial waiting time interval [s]
         self.listening_time                        = listening_time        # time interval in witch to estimate the first period [s]
         self.min_duration_period                   = 1         # minimum time duration of periods [s]
@@ -31,7 +33,7 @@ class Phase_estimation:
         self.diff_len_new_ref                      = 30        # difference in length of the new reference (vector length) compared to the old one, expressed as a percentage of the old length, is accepted.
 
         self.max_length_vec_period  = 1000
-        self.is_set                  = False     # true if the first period hase been estimated
+        self.is_first_period_estimated = False
         self.epsilon                = np.pi
         self.offset                 = 0
         self.phase                  = np.zeros(2)
@@ -46,7 +48,7 @@ class Phase_estimation:
 
         self.counter       = 0
         self.min_index_pre = 0
-        self.position_pre  = 0
+        self.position_prev  = 0
 
         self.len_last_period_discarded = 0
         self.range_post                = 0
@@ -64,30 +66,31 @@ class Phase_estimation:
                 raise ValueError("left_chest, right_chest and belly must be different from None ")
 
 
-    def set_position(self, position, t):
-        if len(self.t) == 0 :
-            self.init_t = t
-        self.t.append(t-self.init_t)
-        if  self.t[-1] > self.wait_time:
-            self.x.append(position[0])
-            self.y.append(position[1])
-            self.z.append(position[2]) 
-            if len(self.x) > 1 :
-                self.ts = self.t[-1] - self.t[-2]
-                self.vx.append((self.x[-1]-self.x[-2])/(self.ts))
-                self.vy.append((self.y[-1]-self.y[-2])/(self.ts))
-                self.vz.append((self.z[-1]-self.z[-2])/(self.ts))
+    def set_position(self, position, curr_time):  # TODO change name of the function?
+        if not self.time_vec:  self.initial_time = curr_time  # initialize initial_time
+
+        self.time_vec.append(curr_time - self.initial_time)
+
+        if  self.time_vec[-1] > self.wait_time:
+            self.x_vec.append(position[0])
+            self.y_vec.append(position[1])
+            self.z_vec.append(position[2])
+            if len(self.x_vec) > 1 :
+                self.step_time = self.time_vec[-1] - self.time_vec[-2]
+                self.vel_x_vec.append((self.x_vec[-1] - self.x_vec[-2]) / self.step_time)
+                self.vel_y_vec.append((self.y_vec[-1] - self.y_vec[-2]) / self.step_time)
+                self.vel_y_vec.append((self.z_vec[-1] - self.z_vec[-2]) / self.step_time)
             else:
-                self.vx.append((self.x[-1]-self.position_pre[0])/(self.ts))
-                self.vy.append((self.y[-1]-self.position_pre[1])/(self.ts))
-                self.vz.append((self.z[-1]-self.position_pre[2])/(self.ts))            
+                self.vel_x_vec.append((self.x_vec[-1] - self.position_prev[0]) / self.step_time)
+                self.vel_y_vec.append((self.y_vec[-1] - self.position_prev[1]) / self.step_time)
+                self.vel_y_vec.append((self.z_vec[-1] - self.position_prev[2]) / self.step_time)
         else:
-            self.position_pre = position
+            self.position_prev = position
                 
-        if self.is_set == False: # if the first completed period has not yet been estimated
-            if self.t[-1] > self.wait_time + self.listening_time:
-                self.last_completed_period=fun_first_period_estimation.extract_last_period_autocorrelation(self.x, self.y, self.z, self.vx, self.vy, self.vz, self.t, self.min_duration_period)
-                self.is_set=True
+        if self.is_first_period_estimated == False: # if the first completed period has not yet been estimated
+            if self.time_vec[-1] > self.wait_time + self.listening_time:
+                self.last_completed_period=fun_first_period_estimation.extract_last_period_autocorrelation(self.x_vec, self.y_vec, self.z_vec, self.vel_x_vec, self.vel_y_vec, self.vel_y_vec, self.time_vec, self.min_duration_period)
+                self.is_first_period_estimated=True
                 self.range_post = int(len(self.last_completed_period)*self.percentage_range_phase_computer_post/100)
                 if self.range_post == 0:
                     self.range_post = 1
@@ -96,22 +99,23 @@ class Phase_estimation:
                     self.range_pre = 1
                 if self.reference is not None:
                     self.compute_phase_offset()
-                for i in range(len(self.last_completed_period),len(self.x)-1):
-                    p = np.array([self.x[i], self.y[i], self.z[i], self.vx[i], self.vy[i], self.vz[i]])
+                for i in range(len(self.last_completed_period), len(self.x_vec) - 1):
+                    p = np.array([self.x_vec[i], self.y_vec[i], self.z_vec[i], self.vel_x_vec[i], self.vel_y_vec[i], self.vel_y_vec[i]])
                     self.phase_computer(p)
                     self.period_estimation(p)
 
-        if len(self.x) > 0:
-            p = np.array([self.x[-1], self.y[-1], self.z[-1], self.vx[-1], self.vy[-1], self.vz[-1]])
+        if len(self.x_vec) > 0:
+            p = np.array([self.x_vec[-1], self.y_vec[-1], self.z_vec[-1], self.vel_x_vec[-1], self.vel_y_vec[-1], self.vel_y_vec[-1]])
         else:
             p = np.array([0,0,0,0,0,0])
 
         self.phase_computer(p) # compute the phase
 
-        if self.is_set == True: # update the completed period estimation
+        if self.is_first_period_estimated == True: # update the completed period estimation
             self.period_estimation(p)
 
         return np.mod(self.phase[1]+self.offset, 2*np.pi)
+
 
     def period_estimation(self,p): # receives position and velocity as input and updates the vector of the last complete period when the phase completes a full cycle.
         if self.phase[1]-self.phase[0] < -self.epsilon:
@@ -143,8 +147,9 @@ class Phase_estimation:
             self.new_period[self.counter,:] = p
             self.counter += 1
 
+
     def phase_computer(self,p):
-        if self.is_set:
+        if self.is_first_period_estimated:
             length_reference = len(self.last_completed_period)
             if self.min_index_pre - self.range_pre < 1:
                 ref_part1 = self.last_completed_period[0:self.min_index_pre + self.range_post]
@@ -188,6 +193,7 @@ class Phase_estimation:
         else:
             self.phase[0] = 0
             self.phase[1] = 0
+
     
     def compute_phase_offset(self):
         x_axis = (self.point_2 - self.point_1) / np.linalg.norm(self.point_2 - self.point_1)
@@ -208,7 +214,7 @@ class Phase_estimation:
         scaled_rotated_centered_ref = rotated_centered_ref * scale_factors
 
         p = scaled_rotated_centered_ref[0, :]
-        vel=(scaled_rotated_centered_ref[1, :]-scaled_rotated_centered_ref[0, :])/self.ts
+        vel=(scaled_rotated_centered_ref[1, :]-scaled_rotated_centered_ref[0, :])/self.step_time
         vel_ref=np.gradient(self.reference, np.arange(0, len(self.reference)*0.01, 0.01), axis=0)
         position_norm = self.reference.copy()
         vel_norm = vel_ref.copy()
