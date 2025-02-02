@@ -181,7 +181,7 @@ class Online3DPhaseEstimator:
             squared_err_pos = loop_for_search.copy()
             squared_err_vel = loop_for_search.copy()
             for i in range(len(loop_for_search)):
-                tmp = ((loop_for_search[i] - curr_kinematics) ** 2)
+                tmp = (loop_for_search[i] - curr_kinematics) ** 2
                 squared_err_pos[i] = [1,1,1,0,0,0] * tmp
                 squared_err_vel[i] = [0,0,0,1,1,1] * tmp
             distances_pos = np.sqrt(np.sum((squared_err_pos), axis=1))  # position error norm
@@ -221,9 +221,10 @@ class Online3DPhaseEstimator:
         scale_factors[np.isnan(scale_factors)] = 1 
         scaled_rotated_centered_ref = rotated_centered_ref * scale_factors
 
+        time_step_baseline = 0.01
         p = scaled_rotated_centered_ref[0, :]
         vel=(scaled_rotated_centered_ref[1, :]-scaled_rotated_centered_ref[0, :])/self.step_time
-        vel_ref=np.gradient(self.baseline_pos_loop, np.arange(0, len(self.baseline_pos_loop) * 0.01, 0.01), axis=0)
+        vel_ref=np.gradient(self.baseline_pos_loop, np.arange(0, len(self.baseline_pos_loop) * time_step_baseline, time_step_baseline), axis=0)
         position_norm = self.baseline_pos_loop.copy()
         vel_norm = vel_ref.copy()
         for i in range(len(self.baseline_pos_loop)):

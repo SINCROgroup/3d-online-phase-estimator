@@ -21,9 +21,10 @@ def compute_signal_period_autocorrelation(pos_x_signal, pos_y_signal, pos_z_sign
     peaks, _ = find_peaks(autocorr_vec_tot)
     peaks_values = autocorr_vec_tot[peaks[np.where(peaks > idx_min_duration)]]
     lower_bound_acceptable_peaks_values = max(peaks_values) - (max(peaks_values) * threshold_acceptable_peaks_wrt_maximum_pcent / 100)
-    idxs_possible_period = np.where(peaks_values > lower_bound_acceptable_peaks_values)
+    idxs_possible_period = np.where(peaks_values > lower_bound_acceptable_peaks_values)[0]  # indexing necessary because np.where returns a tuple containing an array
     start_idx = 0
-    end_idx = peaks[idxs_possible_period[0]][0]
+    assert len(idxs_possible_period) > 0, "No valid first loop was found, try increasing the listening time."
+    end_idx = peaks[idxs_possible_period][0]
 
     x_period  = pos_x_signal[start_idx:end_idx]
     y_period  = pos_y_signal[start_idx:end_idx]
