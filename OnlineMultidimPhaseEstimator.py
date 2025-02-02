@@ -2,7 +2,7 @@ import numpy as np
 from fun_first_period_estimation import compute_signal_period_autocorrelation
 from scipy.signal import find_peaks
 
-class Online3DPhaseEstimator:
+class OnlineMultidimPhaseEstimator:
     def __init__(self,
                  step_time           = 0.01,
                  look_behind_pcent   = 0,
@@ -16,14 +16,14 @@ class Online3DPhaseEstimator:
                  ref_frame_point_3   = None):
 
         # Initialization from arguments
-        self.step_time           = step_time      # [s]
-        self.initial_time        = 0              # start time instant of fase computation [s]
-        self.wait_time           = wait_time      # initial waiting time interval [s]
-        self.listening_time      = listening_time # time interval in witch to estimate the first period [s]
-        self.min_length_quasiperiod = 1              # minimum time duration of periods [s]
-        self.look_ahead_pcent    = look_ahead_pcent  # % of the last completed period before the last nearest point on which estimate the new phase
-        self.look_behind_pcent   = look_behind_pcent # % of the last completed period after the last nearest point on which estimate the new phase
-        self.max_diff_len_new_loop_pcent    = 30             # difference in length of the new reference (vector length) compared to the old one                          , expressed as a percentage of the old length, is accepted.
+        self.step_time                   = step_time      # [s]
+        self.initial_time                = 0              # start time instant of fase computation [s]
+        self.wait_time                   = wait_time      # initial waiting time interval [s]
+        self.listening_time              = listening_time # time interval in witch to estimate the first period [s]
+        self.min_length_quasiperiod      = 1              # minimum time duration of periods [s]
+        self.look_ahead_pcent            = look_ahead_pcent  # % of the last completed period before the last nearest point on which estimate the new phase
+        self.look_behind_pcent           = look_behind_pcent # % of the last completed period after the last nearest point on which estimate the new phase
+        self.max_diff_len_new_loop_pcent = 30             # difference in length of the new reference (vector length) compared to the old one              , expressed as a percentage of the old length, is accepted.
 
         self.max_length_loop     = 1000
         self.is_first_loop_estimated = False
