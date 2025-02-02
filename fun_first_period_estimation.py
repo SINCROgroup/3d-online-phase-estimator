@@ -4,7 +4,17 @@ from scipy.signal import detrend, find_peaks
 
 threshold_acceptable_peaks_wrt_maximum_pcent = 20    # Acceptance range of autocorrelation peaks defined as a percentage of the maximum autocorrelation value.
 
-def compute_signal_period_autocorrelation(pos_x_signal, pos_y_signal, pos_z_signal, vel_x_signal, vel_y_signal, vel_z_signal, local_time_vec, min_length_quasiperiod) -> np.ndarray:
+def compute_signal_period_autocorrelation(pos_signal, vel_signal, local_time_vec, min_length_quasiperiod) -> np.ndarray:
+    pos_signal_stacked = np.vstack(pos_signal)
+    pos_x_signal = pos_signal_stacked[:, 0]
+    pos_y_signal = pos_signal_stacked[:, 1]
+    pos_z_signal = pos_signal_stacked[:, 2]
+
+    vel_signal_stacked = np.vstack(vel_signal)
+    vel_x_signal = vel_signal_stacked[:, 0]
+    vel_y_signal = vel_signal_stacked[:, 1]
+    vel_z_signal = vel_signal_stacked[:, 2]
+
     xn = detrend(pos_x_signal)
     yn = detrend(pos_y_signal)
     zn = detrend(pos_z_signal)

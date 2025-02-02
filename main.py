@@ -15,13 +15,13 @@ listening_time      = 10    # max first period interval [s]
 min_duration_period = 0     # min first period interval [s]
 look_behind_pcent   = 0     # % of the last completed period before the last nearest point on which estimate the new phase
 look_ahead_pcent    = 25    # % of the last completed period after the last nearest point on which estimate the new phase
-# file_path_estimand  = r"data\san_giovanni_2024-10-10\spiral_mc_1.csv"
-# step_time           = 0.01  # [s]
-# rows_to_skip_estimand = [0, 1, 2] + list(range(4, 40))
-# col_names_pos_estimand               = ['TX.3', 'TY.3', 'TZ.3']
-# col_names_ref_frame_estimand_point_1 = ['TX', 'TY', 'TZ']        # belly
-# col_names_ref_frame_estimand_point_2 = ['TX.2', 'TY.2', 'TZ.2']  # right chest
-# col_names_ref_frame_estimand_point_3 = ['TX.1', 'TY.1', 'TZ.1']  # left chest
+file_path_estimand  = r"data\san_giovanni_2024-10-10\spiral_mc_1.csv"
+step_time           = 0.01  # [s]
+rows_to_skip_estimand = [0, 1, 2] + list(range(4, 40))
+col_names_pos_estimand               = ['TX.3', 'TY.3', 'TZ.3']
+col_names_ref_frame_estimand_point_1 = ['TX', 'TY', 'TZ']        # belly
+col_names_ref_frame_estimand_point_2 = ['TX.2', 'TY.2', 'TZ.2']  # right chest
+col_names_ref_frame_estimand_point_3 = ['TX.1', 'TY.1', 'TZ.1']  # left chest
 
 
 # file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX101_pelvic_balance_good.csv"; col_names_pos_estimand = ["HIP_R_X", "HIP_R_Y", "HIP_R_Z"]
@@ -31,16 +31,16 @@ look_ahead_pcent    = 25    # % of the last completed period after the last near
 # file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX301_bridge_good.csv"; col_names_pos_estimand = ["HIP_R_X", "HIP_R_Y", "HIP_R_Z"]
 # file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX302_bridge_bad.csv"; col_names_pos_estimand = ["HIP_R_X", "HIP_R_Y", "HIP_R_Z"]
 # file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX401_plank_good.csv"; col_names_pos_estimand = ["PELVIS_X", "PELVIS_Y", "PELVIS_Z"]
-file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX402_plank_bad.csv"; col_names_pos_estimand = ["PELVIS_X", "PELVIS_Y", "PELVIS_Z"]
-step_time           = 0.01  # [s]
-listening_time      = 30    # max first period interval [s]
+# file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX402_plank_bad.csv"; col_names_pos_estimand = ["PELVIS_X", "PELVIS_Y", "PELVIS_Z"]
+# step_time           = 0.01  # [s]
+# listening_time      = 30    # max first period interval [s]
 
-rows_to_skip_estimand = list(range(0, 9))
+# rows_to_skip_estimand = list(range(0, 9))
 
 
-col_names_ref_frame_estimand_point_1 = col_names_pos_estimand
-col_names_ref_frame_estimand_point_2 = col_names_pos_estimand
-col_names_ref_frame_estimand_point_3 = col_names_pos_estimand
+# col_names_ref_frame_estimand_point_1 = col_names_pos_estimand
+# col_names_ref_frame_estimand_point_2 = col_names_pos_estimand
+# col_names_ref_frame_estimand_point_3 = col_names_pos_estimand
 
 
 file_path_baseline  = r"data\san_giovanni_2024-10-10\spiral_ref.csv"
@@ -71,18 +71,18 @@ ref_frame_estimand_point_3 = np.array(df_estimand[col_names_ref_frame_estimand_p
 # Online estimator
 # ------------------------------------------------
 phase_estimator = Online3DPhaseEstimator(
-    step_time              = step_time,
-    look_behind_pcent      = look_behind_pcent,
-    look_ahead_pcent       = look_ahead_pcent,
-    wait_time              = wait_time,
-    listening_time         = listening_time,
-    min_duration_period    = min_duration_period,
-    baseline_pos_loop      = baseline_pos_loop,
-    ref_frame_point_1      = ref_frame_estimand_point_3,
-    ref_frame_point_2      = ref_frame_estimand_point_2,
-    ref_frame_point_3      = ref_frame_estimand_point_1
+    step_time           = step_time,
+    look_behind_pcent   = look_behind_pcent,
+    look_ahead_pcent    = look_ahead_pcent,
+    wait_time           = wait_time,
+    listening_time      = listening_time,
+    min_duration_period = min_duration_period,
+    baseline_pos_loop   = baseline_pos_loop,
+    ref_frame_point_1   = ref_frame_estimand_point_3,
+    ref_frame_point_2   = ref_frame_estimand_point_2,
+    ref_frame_point_3   = ref_frame_estimand_point_1
 )
-phase_estimand = [None] * len(estimand_pos_signal[:, 0])
+phase_estimand = np.full(len(estimand_pos_signal[:, 0]), None)
 for j in range(len(estimand_pos_signal[:, 0]) - 1):   # TODO rewrite with shape
     phase_estimand[j] = phase_estimator.compute_phase(estimand_pos_signal[j, :], time_vec[j])
 

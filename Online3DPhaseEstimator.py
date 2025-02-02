@@ -36,12 +36,8 @@ class Online3DPhaseEstimator:
         self.new_loop                = np.zeros((self.max_length_loop, 6))
 
         # Initialization of empty attributes
-        self.pos_x_signal     = []
-        self.pos_y_signal     = []
-        self.pos_z_signal     = []
-        self.vel_x_signal = []
-        self.vel_y_signal = []
-        self.vel_z_signal = []
+        self.pos_signal = []
+        self.vel_signal = []
         self.local_time_vec  = []
 
         self.baseline_pos_loop = None
@@ -75,25 +71,17 @@ class Online3DPhaseEstimator:
         self.local_time_vec.append(curr_time - self.initial_time)
 
         if  self.local_time_vec[-1] > self.wait_time:
-            self.pos_x_signal.append(curr_pos[0])         # TODO should be a numpy matrix
-            self.pos_y_signal.append(curr_pos[1])
-            self.pos_z_signal.append(curr_pos[2])
+            self.pos_signal.append(curr_pos)
             self.step_time = self.local_time_vec[-1] - self.local_time_vec[-2]
-            self.vel_x_signal.append((curr_pos[0] - self.prev_pos[0]) / self.step_time)
-            self.vel_y_signal.append((curr_pos[1] - self.prev_pos[1]) / self.step_time)
-            self.vel_z_signal.append((curr_pos[2] - self.prev_pos[2]) / self.step_time)
+            self.vel_signal.append((curr_pos - self.prev_pos) / self.step_time)
 
         self.prev_pos = curr_pos
                 
         if not self.is_first_loop_estimated:
             if self.local_time_vec[-1] > self.wait_time + self.listening_time:
                 self.latest_pos_loop = compute_signal_period_autocorrelation(
-                    pos_x_signal           = self.pos_x_signal,
-                    pos_y_signal           = self.pos_y_signal,
-                    pos_z_signal           = self.pos_z_signal,
-                    vel_x_signal           = self.vel_x_signal,
-                    vel_y_signal           = self.vel_y_signal,
-                    vel_z_signal           = self.vel_z_signal,
+                    pos_signal           = self.pos_signal,
+                    vel_signal           = self.vel_signal,
                     local_time_vec         = self.local_time_vec,
                     min_length_quasiperiod = self.min_length_quasiperiod)
 
@@ -104,13 +92,13 @@ class Online3DPhaseEstimator:
                 if self.baseline_pos_loop is not None:  self.compute_phase_offset()   # TODO introduce a string mode_algorithm that can be tethered or un tethered. Should be put elsewhere
 
                 # estimate phase for the first loop
-                for i in range(len(self.latest_pos_loop), len(self.pos_x_signal) - 1):
-                    curr_kinematics = np.array([self.pos_x_signal[i], self.pos_y_signal[i], self.pos_z_signal[i], self.vel_x_signal[i], self.vel_y_signal[i], self.vel_z_signal[i]])
+                for i in range(len(self.latest_pos_loop), len(self.pos_signal) - 1):
+                    curr_kinematics = np.concatenate((self.pos_signal[i], self.vel_signal[i]))
                     self.compute_phase_internal(curr_kinematics)
                     self.update_latest_loop(curr_kinematics)
 
-        if len(self.pos_x_signal) > 0:
-            curr_kinematics = np.array([self.pos_x_signal[-1], self.pos_y_signal[-1], self.pos_z_signal[-1], self.vel_x_signal[-1], self.vel_y_signal[-1], self.vel_z_signal[-1]])
+        if len(self.pos_signal) > 0:
+            curr_kinematics = np.concatenate((self.pos_signal[-1], self.vel_signal[-1]))
         else:
             curr_kinematics = np.array([0,0,0,0,0,0])
 
