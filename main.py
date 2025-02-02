@@ -60,7 +60,7 @@ phase_estimator = Online3DPhaseEstimator(
 )
 phase_estimand = [None] * len(estimand_pos_signal[:, 0])
 for j in range(len(estimand_pos_signal[:, 0]) - 1):   # TODO rewrite with shape
-    phase_estimand[j] = phase_estimator.set_position(estimand_pos_signal[j, :], time_vec[j])
+    phase_estimand[j] = phase_estimator.compute_phase(estimand_pos_signal[j, :], time_vec[j])
 
 
 # Offline estimator

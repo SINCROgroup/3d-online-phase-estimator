@@ -23,17 +23,17 @@ class Online3DPhaseEstimator:
         self.min_length_quasiperiod = 1              # minimum time duration of periods [s]
         self.look_ahead_pcent    = look_ahead_pcent  # % of the last completed period before the last nearest point on which estimate the new phase
         self.look_behind_pcent   = look_behind_pcent # % of the last completed period after the last nearest point on which estimate the new phase
-        self.diff_len_new_ref    = 30             # difference in length of the new reference (vector length) compared to the old one                          , expressed as a percentage of the old length, is accepted.
+        self.max_diff_len_new_loop_pcent    = 30             # difference in length of the new reference (vector length) compared to the old one                          , expressed as a percentage of the old length, is accepted.
 
-        self.max_length_vec_period     = 1000
+        self.max_length_loop     = 1000
         self.is_first_loop_estimated = False
         self.epsilon                   = np.pi
         self.offset                    = 0
         self.phase                     = np.zeros(2)
         self.curr_phase = None
         self.prev_phase = None
-        self.latest_pos_loop        = np.zeros((self.max_length_vec_period, 6))
-        self.new_period                = np.zeros((self.max_length_vec_period, 6))
+        self.latest_pos_loop        = np.zeros((self.max_length_loop, 6))
+        self.new_loop                = np.zeros((self.max_length_loop, 6))
 
         # Initialization of empty attributes
         self.pos_x_signal     = []
@@ -49,8 +49,8 @@ class Online3DPhaseEstimator:
         self.point_2   = None
         self.point_3   = None
 
-        self.counter       = 0
-        self.min_index_pre = 0
+        self.idx_curr_time_loop       = 0
+        self.idx_curr_phase_in_latest_loop = 0
         self.prev_pos = [0, 0, 0]
 
         self.len_last_period_discarded = 0
@@ -69,7 +69,7 @@ class Online3DPhaseEstimator:
                 raise ValueError("left_chest, right_chest and belly must be different from None ")
 
 
-    def set_position(self, curr_pos, curr_time) -> float:  # TODO change name of the function?
+    def compute_phase(self, curr_pos, curr_time) -> float:  # TODO change name of the function?
         if not self.local_time_vec:  self.initial_time = curr_time  # initialize initial_time
 
         self.local_time_vec.append(curr_time - self.initial_time)
@@ -106,87 +106,93 @@ class Online3DPhaseEstimator:
                 # estimate phase for the first loop
                 for i in range(len(self.latest_pos_loop), len(self.pos_x_signal) - 1):
                     curr_kinematics = np.array([self.pos_x_signal[i], self.pos_y_signal[i], self.pos_z_signal[i], self.vel_x_signal[i], self.vel_y_signal[i], self.vel_z_signal[i]])
-                    self.compute_phase(curr_kinematics)
-                    self.estimate_period(curr_kinematics)
+                    self.compute_phase_internal(curr_kinematics)
+                    self.update_latest_loop(curr_kinematics)
 
         if len(self.pos_x_signal) > 0:
             curr_kinematics = np.array([self.pos_x_signal[-1], self.pos_y_signal[-1], self.pos_z_signal[-1], self.vel_x_signal[-1], self.vel_y_signal[-1], self.vel_z_signal[-1]])
         else:
             curr_kinematics = np.array([0,0,0,0,0,0])
 
-        self.compute_phase(curr_kinematics) # compute the phase
+        self.compute_phase_internal(curr_kinematics)
 
-        if self.is_first_loop_estimated:  self.estimate_period(curr_kinematics)
+        if self.is_first_loop_estimated:  self.update_latest_loop(curr_kinematics)
 
         return np.mod(self.curr_phase + self.offset, 2*np.pi)
 
 
-    def estimate_period(self, curr_kinematics): # receives position and velocity as input and updates the vector of the last complete period when the phase completes a full cycle.
-        if self.curr_phase - self.prev_phase < -self.epsilon:
-            if abs(self.counter-len(self.latest_pos_loop)) < len(self.latest_pos_loop)*self.diff_len_new_ref/100: # Ensure that the difference in length between the new period and the previous one is not greater than the range set by the user.
-                self.latest_pos_loop = self.new_period[0:self.counter, :]
-                self.look_ahead_range = int(len(self.latest_pos_loop) * self.look_ahead_pcent / 100)
-                if self.look_ahead_range==0:  self.look_ahead_range=1
-                self.look_behind_range = int(len(self.latest_pos_loop) * self.look_behind_pcent / 100)
-                if self.look_behind_range == 0:  self.look_behind_range = 1
+    def update_latest_loop(self, curr_kinematics): # receives position and velocity as input and updates the vector of the last complete period when the phase completes a full cycle.
+        """checks whether it is necessary to update the latest loop, and, if so, does it"""
+        def update_latest_loop_and_ranges() -> None:
+            self.latest_pos_loop   = self.new_loop[0:self.idx_curr_time_loop, :]
+            self.look_ahead_range  = max(1, int(len(self.latest_pos_loop) * self.look_ahead_pcent  / 100))
+            self.look_behind_range = max(1, int(len(self.latest_pos_loop) * self.look_behind_pcent / 100))
 
-            elif abs(self.counter-self.len_last_period_discarded) < self.len_last_period_discarded*self.diff_len_new_ref/100:
-                self.latest_pos_loop = self.new_period[0:self.counter, :]
-                self.look_ahead_range = int(len(self.latest_pos_loop) * self.look_ahead_pcent / 100)
-                if self.look_ahead_range==0:
-                    self.look_ahead_range=1
-                self.look_behind_range = int(len(self.latest_pos_loop) * self.look_behind_pcent / 100)
-                if self.look_behind_range == 0:
-                    self.look_behind_range = 1
+        if self.curr_phase - self.prev_phase < -self.epsilon:   # a quasiperiodicity window ended
+            length_new_loop = self.idx_curr_time_loop + 1
+            # if the difference in length between new loop and previous loop is smaller than the range set by user
+            if abs(length_new_loop - len(self.latest_pos_loop)) < len(self.latest_pos_loop)*self.max_diff_len_new_loop_pcent/100:
+                update_latest_loop_and_ranges()
+
+            # if the difference in length between new loop and previous discarded loop is smaller than the range set by user   # TODO MC: I don't get the rationale behind this logic
+            elif abs(length_new_loop - self.len_last_period_discarded) < self.len_last_period_discarded*self.max_diff_len_new_loop_pcent/100:
+                update_latest_loop_and_ranges()
                 self.len_last_period_discarded = 0
 
             else:
-                self.len_last_period_discarded = self.counter
+                self.len_last_period_discarded = self.idx_curr_time_loop + 1
 
-            self.new_period = np.zeros((self.max_length_vec_period, 6))
-            self.counter = 0
-        if self.counter < self.max_length_vec_period:
-            self.new_period[self.counter,:] = curr_kinematics
-            self.counter += 1
+            # reinitialize new_loop
+            self.new_loop = np.zeros((self.max_length_loop, 6))
+            self.idx_curr_time_loop = 0
+
+        # append current kinematics to new loop
+        if self.idx_curr_time_loop < self.max_length_loop:
+            self.new_loop[self.idx_curr_time_loop, :] = curr_kinematics
+            self.idx_curr_time_loop += 1
 
 
-    def compute_phase(self, p):
+    def compute_phase_internal(self, curr_kinematics):
         if self.is_first_loop_estimated:
-            length_reference = len(self.latest_pos_loop)
-            if self.min_index_pre - self.look_behind_range < 1:
-                ref_part1 = self.latest_pos_loop[0:self.min_index_pre + self.look_ahead_range]
-                ref_part2 = self.latest_pos_loop[length_reference - self.look_behind_range + self.min_index_pre:length_reference]
-                ref = np.vstack((ref_part1, ref_part2))
+            len_latest_loop = len(self.latest_pos_loop)
+            if self.idx_curr_phase_in_latest_loop - self.look_behind_range < 1:
+                #    loop: [part_1 - - - - - - - - part_2]
+                loop_part_1 = self.latest_pos_loop[0 : self.idx_curr_phase_in_latest_loop + self.look_ahead_range]
+                loop_part_2 = self.latest_pos_loop[len_latest_loop - self.look_behind_range + self.idx_curr_phase_in_latest_loop : len_latest_loop]
+                loop_for_search = np.vstack((loop_part_1, loop_part_2))
 
-                index_part1 = np.arange(1, self.min_index_pre + self.look_ahead_range + 1)
-                index_part2 = np.arange(length_reference - self.look_behind_range + self.min_index_pre, length_reference + 1)
-                index = np.concatenate((index_part1, index_part2))
-            elif self.min_index_pre + self.look_ahead_range > length_reference:
-                ref_part1 = self.latest_pos_loop[self.min_index_pre - self.look_behind_range:length_reference]
-                ref_part2 = self.latest_pos_loop[0:self.min_index_pre + self.look_ahead_range - length_reference]
-                ref = np.vstack((ref_part1, ref_part2))
+                idxs_part_1 = np.arange(1, self.idx_curr_phase_in_latest_loop + self.look_ahead_range + 1)
+                idxs_part_2 = np.arange(len_latest_loop - self.look_behind_range + self.idx_curr_phase_in_latest_loop, len_latest_loop + 1)
+                idxs_loop_for_search = np.concatenate((idxs_part_1, idxs_part_2))
+            elif self.idx_curr_phase_in_latest_loop + self.look_ahead_range > len_latest_loop:
+                #    loop: [part_2 - - - - - - - - part_1]
+                loop_part_1 = self.latest_pos_loop[self.idx_curr_phase_in_latest_loop - self.look_behind_range:len_latest_loop]
+                loop_part_2 = self.latest_pos_loop[0:self.idx_curr_phase_in_latest_loop + self.look_ahead_range - len_latest_loop]
+                loop_for_search = np.vstack((loop_part_1, loop_part_2))
 
-                index_part1 = np.arange(self.min_index_pre - self.look_behind_range, length_reference + 1)
-                index_part2 = np.arange(1, self.min_index_pre + self.look_ahead_range - length_reference + 1)
-                index = np.concatenate((index_part1, index_part2))
+                idxs_part_1 = np.arange(self.idx_curr_phase_in_latest_loop - self.look_behind_range, len_latest_loop + 1)
+                idxs_part_2 = np.arange(1, self.idx_curr_phase_in_latest_loop + self.look_ahead_range - len_latest_loop + 1)
+                idxs_loop_for_search = np.concatenate((idxs_part_1, idxs_part_2))
             else:
-                ref = self.latest_pos_loop[self.min_index_pre - self.look_behind_range:self.min_index_pre + self.look_ahead_range]
-                index = np.arange(self.min_index_pre - self.look_behind_range, self.min_index_pre + self.look_ahead_range + 1)
+                #   loop: [- - - - - - single part - - - - -]
+                loop_for_search = self.latest_pos_loop[self.idx_curr_phase_in_latest_loop - self.look_behind_range:self.idx_curr_phase_in_latest_loop + self.look_ahead_range]
+                idxs_loop_for_search = np.arange(self.idx_curr_phase_in_latest_loop - self.look_behind_range, self.idx_curr_phase_in_latest_loop + self.look_ahead_range + 1)
 
-            ref_p = ref.copy()
-            ref_v = ref.copy()
-            for i in range(len(ref)):
-                ref_p[i]=[1,1,1,0,0,0]*((ref[i]-p)**2)
-                ref_v[i]=[0,0,0,1,1,1]*((ref[i]-p)**2)  
-            distances_p = np.sqrt(np.sum((ref_p), axis=1))  # position error norm
-            distances_v = np.sqrt(np.sum((ref_v), axis=1))  # velocity error norm
-            distances_p = distances_p/max(distances_p)      # normalized position error norm
-            distances_v = distances_v/max(distances_v)      # normalized velocity error norm
-            distances = distances_p + distances_v           # normalized error
+            squared_err_pos = loop_for_search.copy()
+            squared_err_vel = loop_for_search.copy()
+            for i in range(len(loop_for_search)):
+                tmp = ((loop_for_search[i] - curr_kinematics) ** 2)
+                squared_err_pos[i] = [1,1,1,0,0,0] * tmp
+                squared_err_vel[i] = [0,0,0,1,1,1] * tmp
+            distances_pos = np.sqrt(np.sum((squared_err_pos), axis=1))  # position error norm
+            distances_vel = np.sqrt(np.sum((squared_err_vel), axis=1))  # velocity error norm
+            distances_pos = distances_pos/max(distances_pos)      # normalized position error norm
+            distances_vel = distances_vel/max(distances_vel)      # normalized velocity error norm
+            distances = distances_pos + distances_vel           # normalized error
             index_min_distance = np.argmin(distances)       # minimum distance point
-            self.min_index_pre = index[index_min_distance]
+            self.idx_curr_phase_in_latest_loop = idxs_loop_for_search[index_min_distance]
             self.prev_phase = self.curr_phase
-            self.curr_phase = (2 * np.pi  * self.min_index_pre) / length_reference
+            self.curr_phase = (2 * np.pi * self.idx_curr_phase_in_latest_loop) / len_latest_loop
             if self.curr_phase - self.prev_phase > self.epsilon:  # Avoid 0 to 2pi jumps
                  self.curr_phase = self.prev_phase
             if self.curr_phase - self.prev_phase < 0 and self.prev_phase - self.curr_phase < self.epsilon:
