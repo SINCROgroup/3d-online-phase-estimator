@@ -4,16 +4,16 @@ from scipy.signal import detrend, find_peaks
 
 threshold_acceptable_peaks_wrt_maximum_pcent = 20    # Acceptance range of autocorrelation peaks defined as a percentage of the maximum autocorrelation value.
 
-def compute_signal_period_autocorrelation(x_vec, y_vec, z_vec, vel_x_vec, vel_y_vec, vel_z_vec, time_vec, min_duration_period) -> np.ndarray:
-    xn = detrend(x_vec)
-    yn = detrend(y_vec)
-    zn = detrend(z_vec)
+def compute_signal_period_autocorrelation(pos_x_signal, pos_y_signal, pos_z_signal, vel_x_signal, vel_y_signal, vel_z_signal, local_time_vec, min_length_quasiperiod) -> np.ndarray:
+    xn = detrend(pos_x_signal)
+    yn = detrend(pos_y_signal)
+    zn = detrend(pos_z_signal)
     autocorr_vec_x = compute_autocorr_vec(xn)
     autocorr_vec_y = compute_autocorr_vec(yn)
     autocorr_vec_z = compute_autocorr_vec(zn)
     autocorr_vec_tot = autocorr_vec_x + autocorr_vec_y + autocorr_vec_z
 
-    idx_min_duration = np.argmax(np.array(time_vec) > min_duration_period)
+    idx_min_duration = np.argmax(np.array(local_time_vec) > min_length_quasiperiod)
     autocorr_vec_tot[:idx_min_duration] = autocorr_vec_tot[idx_min_duration]
 
     autocorr_vec_tot = autocorr_vec_tot/np.max(np.abs(autocorr_vec_tot))
@@ -25,12 +25,12 @@ def compute_signal_period_autocorrelation(x_vec, y_vec, z_vec, vel_x_vec, vel_y_
     start_idx = 0
     end_idx = peaks[idxs_possible_period[0]][0]
 
-    x_period  = x_vec[start_idx:end_idx]
-    y_period  = y_vec[start_idx:end_idx]
-    z_period  = z_vec[start_idx:end_idx]
-    vel_x_period = vel_x_vec[start_idx:end_idx]
-    vel_y_period = vel_y_vec[start_idx:end_idx]
-    vel_z_period = vel_z_vec[start_idx:end_idx]
+    x_period  = pos_x_signal[start_idx:end_idx]
+    y_period  = pos_y_signal[start_idx:end_idx]
+    z_period  = pos_z_signal[start_idx:end_idx]
+    vel_x_period = vel_x_signal[start_idx:end_idx]
+    vel_y_period = vel_y_signal[start_idx:end_idx]
+    vel_z_period = vel_z_signal[start_idx:end_idx]
 
     signal_period = np.column_stack((x_period, y_period, z_period, vel_x_period, vel_y_period, vel_z_period))
 
