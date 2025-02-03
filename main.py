@@ -11,7 +11,7 @@ from OnlineMultidimPhaseEstimator import OnlineMultidimPhaseEstimator
 # Parameters
 # ------------------------------------------------
 discarded_time                 = 1      # [s] discarded at the beginning before estimation
-min_duration_first_quasiperiod = 0     # [s]
+min_duration_first_quasiperiod = 0      # [s]
 listening_time                 = 10     # [s] waits this time before estimating first loop must contain 2 quasiperiods
 look_behind_pcent              = 0      # % of last completed loop before last nearest point on which estimate the new phase
 look_ahead_pcent               = 25     # % of last completed loop after  last nearest point on which estimate the new phase
@@ -76,9 +76,9 @@ n_dims_estimand_pos = estimand_pos_signal.shape[1]
 n_time_instants     = estimand_pos_signal.shape[0]
 phase_estimator = OnlineMultidimPhaseEstimator(
     n_dims_estimand_pos            = n_dims_estimand_pos,
-    step_time                      = step_time,
-    discarded_time= discarded_time,
+    # step_time                      = step_time,
     listening_time                 = listening_time,
+    discarded_time                 = discarded_time,
     min_duration_first_quasiperiod = min_duration_first_quasiperiod,
     look_behind_pcent              = look_behind_pcent,
     look_ahead_pcent               = look_ahead_pcent,
