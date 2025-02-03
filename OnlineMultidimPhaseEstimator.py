@@ -1,4 +1,6 @@
 import numpy as np
+from numpy.matlib import zeros
+
 from fun_first_period_estimation import compute_signal_period_autocorrelation
 from scipy.signal import find_peaks
 
@@ -99,7 +101,7 @@ class OnlineMultidimPhaseEstimator:
         if len(self.pos_signal) > 0:
             curr_kinematics = np.concatenate((self.pos_signal[-1], self.vel_signal[-1]))
         else:
-            curr_kinematics = np.array([0,0,0,0,0,0])
+            curr_kinematics = zeros(2*self.n_dim)
 
         self.compute_phase_internal(curr_kinematics)
 
