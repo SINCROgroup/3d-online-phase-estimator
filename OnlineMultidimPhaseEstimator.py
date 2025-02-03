@@ -90,7 +90,7 @@ class OnlineMultidimPhaseEstimator:
                 self.look_ahead_range  = max(1, int(len(self.latest_pos_loop) * self.look_ahead_pcent  / 100))   # range_post is the number of points after the last nearest point on which estimate the new phase
                 self.look_behind_range = max(1, int(len(self.latest_pos_loop) * self.look_behind_pcent / 100))
 
-                if self.is_use_baseline:  self.compute_phase_offset()   # TODO Should be put elsewhere
+                if self.is_use_baseline:  self.compute_phase_offset()
 
                 # estimate phase for the first loop
                 for i in range(len(self.latest_pos_loop), len(self.pos_signal) - 1):
