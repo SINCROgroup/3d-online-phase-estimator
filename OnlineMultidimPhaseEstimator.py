@@ -6,7 +6,7 @@ from scipy.signal import find_peaks
 
 class OnlineMultidimPhaseEstimator:
     def __init__(self,
-                 n_dim: int,
+                 n_dims: int,
                  step_time                      = 0.01,
                  wait_time                      = 5,
                  listening_time                 = 15,
@@ -20,7 +20,7 @@ class OnlineMultidimPhaseEstimator:
                  ref_frame_point_3              = None):
 
         # Initialization from arguments
-        self.n_dim                       = n_dim
+        self.n_dim                       = n_dims
         self.step_time                   = step_time      # [s]
         self.wait_time                   = wait_time      # initial waiting time interval [s]
         self.listening_time              = listening_time # time interval in witch to estimate the first period [s]
@@ -54,16 +54,16 @@ class OnlineMultidimPhaseEstimator:
         self.look_behind_range         = 0
 
         if is_use_baseline:
-            assert n_dim == 3, "Tethered mode can be used only with n_dim = 3"
+            assert n_dims == 3, "Tethered mode can be used only with n_dim = 3"
             assert baseline_pos_loop is not None, "Tethered mode was required but baseline_pos_loop was not provided"
             assert ref_frame_point_1 is not None, "Tethered mode was required but ref_frame_point_1 was not provided"
             assert ref_frame_point_2 is not None, "Tethered mode was required but ref_frame_point_2 was not provided"
             assert ref_frame_point_3 is not None, "Tethered mode was required but ref_frame_point_3 was not provided"
 
-        self.baseline_pos_loop = baseline_pos_loop.copy()
-        self.ref_frame_point_1 = ref_frame_point_1.copy()
-        self.ref_frame_point_2 = ref_frame_point_2.copy()
-        self.ref_frame_point_3 = ref_frame_point_3.copy()
+            self.baseline_pos_loop = baseline_pos_loop.copy()
+            self.ref_frame_point_1 = ref_frame_point_1.copy()
+            self.ref_frame_point_2 = ref_frame_point_2.copy()
+            self.ref_frame_point_3 = ref_frame_point_3.copy()
 
 
     def compute_phase(self, curr_pos, curr_time) -> float:
