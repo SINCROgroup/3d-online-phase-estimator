@@ -1,10 +1,10 @@
 import numpy as np
-from numpy import signedinteger
-from numpy._typing import _32Bit, _64Bit
-from numpy.matlib import zeros
+from scipy.signal import detrend, find_peaks
 
-from fun_first_period_estimation import compute_signal_period_autocorrelation
-from scipy.signal import find_peaks
+
+##################################################
+# Estimator class
+##################################################
 
 class OnlineMultidimPhaseEstimator:
     def __init__(self,
@@ -43,9 +43,9 @@ class OnlineMultidimPhaseEstimator:
         self.idx_curr_phase_in_latest_loop = 0
         self.prev_pos = np.zeros(self.n_dims)
 
-        self.max_length_loop         = 1000
-        self.latest_pos_loop         = np.zeros((self.max_length_loop, 2*self.n_dims))   # TODO test making this not bounded bt max length
-        self.new_loop                = np.zeros((self.max_length_loop, 2*self.n_dims))   # TODO make this something which is appended each time
+        self.max_length_loop         = 10000
+        self.latest_pos_loop         = None
+        self.new_loop                = np.zeros((self.max_length_loop, 2*self.n_dims))   # TODO make this something which is appended each time?
 
         self.pos_signal              = []
         self.vel_signal              = []
@@ -73,6 +73,9 @@ class OnlineMultidimPhaseEstimator:
         if not self.local_time_signal:  self.initial_time = curr_time  # initialize initial_time
         self.local_time_signal.append(curr_time - self.initial_time)
 
+        # TODO MC: mi sembra che questa funzione dovrebbe essere divisa in due parti, la prima aggiorna lo stato, tra "sleeping", "listening" e "estimating"
+        # la seconda parte agisce in base in base allo stato corrente (struttura match case), la funzione diventa "update_estimator", la fase diventa un vettore interamente accessibile
+
         if  self.local_time_signal[-1] > self.discarded_time:
             #  update position and velocity
             self.curr_step_time = self.local_time_signal[-1] - self.local_time_signal[-2]
@@ -83,7 +86,7 @@ class OnlineMultidimPhaseEstimator:
 
             if self.local_time_signal[-1] > self.discarded_time + self.listening_time:
                 if not self.is_first_loop_estimated:
-                    self.latest_pos_loop = compute_signal_period_autocorrelation(
+                    self.latest_pos_loop = compute_loop_with_autocorrelation(
                         pos_signal               = self.pos_signal,
                         vel_signal               = self.vel_signal,
                         local_time_vec           = self.local_time_signal,
@@ -101,7 +104,7 @@ class OnlineMultidimPhaseEstimator:
                         self.compute_phase_internal(curr_kinematics)
                         self.update_latest_loop(curr_kinematics)
         else:
-            curr_kinematics = zeros(2 * self.n_dims)
+            curr_kinematics = np.zeros(2 * self.n_dims)
 
         self.compute_phase_internal(curr_kinematics)   # TODO it would be better if these final steps could be integrated in the previous logic
 
@@ -143,7 +146,7 @@ class OnlineMultidimPhaseEstimator:
             self.idx_curr_time_loop += 1
 
 
-    def compute_phase_internal(self, curr_kinematics):
+    def compute_phase_internal(self, curr_kinematics):   # TODO bad name
         if self.is_first_loop_estimated:
             len_latest_loop = len(self.latest_pos_loop)
             if self.idx_curr_phase_in_latest_loop - self.look_behind_range < 1:   # TODO why not < 0?
@@ -181,7 +184,7 @@ class OnlineMultidimPhaseEstimator:
                  self.curr_phase = self.prev_phase
             if 0 > self.curr_phase - self.prev_phase > - self.phase_jump_for_loop_detection:   # avoid going backward  # TODO MC: then why do have look_behind if this is hard-coded?
                 self.curr_phase = self.prev_phase
-        
+
         else:
             self.prev_phase = 0   # TODO: maybe it's better to return None when we cannot estimate phase. Also this function could just have an assert, and the logic is managed in the caller
             self.curr_phase = 0
@@ -215,12 +218,69 @@ class OnlineMultidimPhaseEstimator:
                                          curr_vel   = curr_vel_)
         self.phase_offset = (2 * np.pi * index) / len(self.baseline_pos_loop)
 
-def compute_idx_min_distance(pos_signal, vel_signal, curr_pos, curr_vel) -> signedinteger[_32Bit | _64Bit]:
+
+##################################################
+# Helper functions
+##################################################
+
+threshold_acceptable_peaks_wrt_maximum_pcent = 20  # Acceptance range of autocorrelation peaks defined as a percentage of the maximum autocorrelation value.
+
+
+def compute_loop_with_autocorrelation(pos_signal, vel_signal, local_time_vec, min_duration_quasiperiod) -> np.ndarray:
+    n_dim = len(pos_signal[0])
+    pos_signal_stacked = np.vstack(pos_signal)  # time flows vertically
+    vel_signal_stacked = np.vstack(vel_signal)
+
+    pos_signal_unstacked = np.full(n_dim, None)
+    autocorr_vecs_per_dim = np.full(n_dim, None)
+    for i in range(n_dim):
+        pos_signal_unstacked[i] = pos_signal_stacked[:, i]
+        autocorr_vecs_per_dim[i] = compute_autocorr_vec(detrend(pos_signal_unstacked[i]))
+    autocorr_vec_tot = np.sum(np.array(autocorr_vecs_per_dim), axis=0)
+
+    idx_min_length = np.argmax(np.array(local_time_vec) > min_duration_quasiperiod)  # argmax finds the first True
+    autocorr_vec_tot[:idx_min_length] = autocorr_vec_tot[idx_min_length]
+
+    autocorr_vec_tot = autocorr_vec_tot / np.max(np.abs(autocorr_vec_tot))
+
+    peaks, _ = find_peaks(autocorr_vec_tot)
+    peaks_values = autocorr_vec_tot[peaks[np.where(peaks > idx_min_length)]]
+    lower_bound_acceptable_peaks_values = max(peaks_values) - (
+                max(peaks_values) * threshold_acceptable_peaks_wrt_maximum_pcent / 100)
+    idxs_possible_period = np.where(peaks_values > lower_bound_acceptable_peaks_values)[
+        0]  # indexing necessary because np.where returns a tuple containing an array
+    assert len(idxs_possible_period) > 0, "No valid first loop was found, try increasing the listening time."
+    idx_start_loop = 0
+    idx_end_loop = peaks[idxs_possible_period][0]
+
+    pos_loop = pos_signal_stacked[idx_start_loop:idx_end_loop, :]
+    vel_loop = vel_signal_stacked[idx_start_loop:idx_end_loop, :]
+    return np.column_stack((pos_loop, vel_loop))
+
+
+def compute_autocorr_vec(signal: np.ndarray) -> np.ndarray:
+    max_lag = len(signal) // 2
+    autocorr_vec = np.zeros(max_lag + 1)
+
+    for lag in range(1, len(autocorr_vec)):
+        var = np.var(signal[0:2 * lag])
+        if var == 0:
+            autocorr_vec[lag] = 0
+        else:
+            mean = np.mean(signal[0:2 * lag])
+            sum_ = 0
+            for t in range(lag):
+                sum_ += (signal[t] - mean) * (signal[t + lag] - mean)
+            autocorr_vec[lag] = sum_ / (lag * var)
+    return autocorr_vec
+
+
+def compute_idx_min_distance(pos_signal, vel_signal, curr_pos, curr_vel) -> int:
     pos_signal_copied = pos_signal.copy()
     vel_signal_copied = vel_signal.copy()
     distances_pos = np.sqrt(np.sum((pos_signal_copied - curr_pos) ** 2, axis=1))
     distances_vel = np.sqrt(np.sum((vel_signal_copied - curr_vel) ** 2, axis=1))
-    distances_pos = distances_pos / max(distances_pos, default=1)  # avoid dividing by zero
+    distances_pos = distances_pos / max(distances_pos, default=1)  # avoids dividing by zero
     distances_vel = distances_vel / max(distances_vel, default=1)
     return np.argmin(distances_pos + distances_vel)
 
