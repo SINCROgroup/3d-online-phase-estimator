@@ -4,68 +4,67 @@ from scipy.signal import find_peaks
 
 class OnlineMultidimPhaseEstimator:
     def __init__(self,
-                 step_time           = 0.01,
-                 look_behind_pcent   = 0,
-                 look_ahead_pcent    = 25,
-                 wait_time           = 5,
-                 listening_time      = 15,
-                 min_duration_period = None,
-                 baseline_pos_loop   = None,
-                 ref_frame_point_1   = None,
-                 ref_frame_point_2   = None,
-                 ref_frame_point_3   = None):
+                 n_dim: int,
+                 step_time                      = 0.01,
+                 wait_time                      = 5,
+                 listening_time                 = 15,
+                 min_duration_first_quasiperiod = 1,
+                 look_behind_pcent              = 0,
+                 look_ahead_pcent               = 25,
+                 is_use_baseline                = False,
+                 baseline_pos_loop              = None,
+                 ref_frame_point_1              = None,
+                 ref_frame_point_2              = None,
+                 ref_frame_point_3              = None):
 
         # Initialization from arguments
+        self.n_dim                       = n_dim
         self.step_time                   = step_time      # [s]
-        self.initial_time                = 0              # start time instant of fase computation [s]
         self.wait_time                   = wait_time      # initial waiting time interval [s]
         self.listening_time              = listening_time # time interval in witch to estimate the first period [s]
-        self.min_length_quasiperiod      = 1              # minimum time duration of periods [s]
         self.look_ahead_pcent            = look_ahead_pcent  # % of the last completed period before the last nearest point on which estimate the new phase
         self.look_behind_pcent           = look_behind_pcent # % of the last completed period after the last nearest point on which estimate the new phase
+        self.is_use_baseline             = is_use_baseline
+        self.min_duration_quasiperiod    = min_duration_first_quasiperiod # [s]
+
+        self.initial_time                = 0              # start time instant of fase computation [s]
         self.max_diff_len_new_loop_pcent = 30             # difference in length of the new reference (vector length) compared to the old one              , expressed as a percentage of the old length, is accepted.
-
-        self.max_length_loop     = 1000
         self.is_first_loop_estimated = False
-        self.epsilon                   = np.pi
-        self.offset                    = 0
-        self.phase                     = np.zeros(2)
-        self.curr_phase = None
-        self.prev_phase = None
-        self.latest_pos_loop        = np.zeros((self.max_length_loop, 6))
-        self.new_loop                = np.zeros((self.max_length_loop, 6))
-
-        # Initialization of empty attributes
-        self.pos_signal = []
-        self.vel_signal = []
-        self.local_time_vec  = []
-
-        self.baseline_pos_loop = None
-        self.point_1   = None
-        self.point_2   = None
-        self.point_3   = None
-
+        self.epsilon                 = np.pi
+        self.offset                  = 0
+        self.curr_phase              = None
+        self.prev_phase              = None
         self.idx_curr_time_loop       = 0
         self.idx_curr_phase_in_latest_loop = 0
-        self.prev_pos = [0, 0, 0]
+        self.prev_pos = np.zeros(self.n_dim)
+
+        self.max_length_loop         = 1000
+        self.latest_pos_loop         = np.zeros((self.max_length_loop, 2*self.n_dim))   # TODO test making this not bounded bt max length
+        self.new_loop                = np.zeros((self.max_length_loop, 2*self.n_dim))   # TODO make this something which is appended each time
+
+        self.pos_signal              = []
+        self.vel_signal              = []
+        self.local_time_vec          = []
+        self.delimiter_time_instants = []
 
         self.len_last_period_discarded = 0
         self.look_ahead_range          = 0
         self.look_behind_range         = 0
 
-        if min_duration_period is not None:
-            self.min_length_quasiperiod = min_duration_period
-        if baseline_pos_loop is not None:
-            self.baseline_pos_loop=baseline_pos_loop.copy()
-            if ref_frame_point_1 is not None and ref_frame_point_2 is not None and ref_frame_point_3 is not None:
-                self.point_1 = ref_frame_point_1
-                self.point_2 = ref_frame_point_2
-                self.point_3 = ref_frame_point_3
-            else:
-                raise ValueError("left_chest, right_chest and belly must be different from None ")
+        if is_use_baseline:
+            assert n_dim == 3, "Tethered mode can be used only with n_dim = 3"
+            assert baseline_pos_loop is not None, "Tethered mode was required but baseline_pos_loop was not provided"
+            assert ref_frame_point_1 is not None, "Tethered mode was required but ref_frame_point_1 was not provided"
+            assert ref_frame_point_2 is not None, "Tethered mode was required but ref_frame_point_2 was not provided"
+            assert ref_frame_point_3 is not None, "Tethered mode was required but ref_frame_point_3 was not provided"
+
+        self.baseline_pos_loop = baseline_pos_loop.copy()
+        self.ref_frame_point_1 = ref_frame_point_1.copy()
+        self.ref_frame_point_2 = ref_frame_point_2.copy()
+        self.ref_frame_point_3 = ref_frame_point_3.copy()
 
 
-    def compute_phase(self, curr_pos, curr_time) -> float:  # TODO change name of the function?
+    def compute_phase(self, curr_pos, curr_time) -> float:
         if not self.local_time_vec:  self.initial_time = curr_time  # initialize initial_time
 
         self.local_time_vec.append(curr_time - self.initial_time)
@@ -80,16 +79,16 @@ class OnlineMultidimPhaseEstimator:
         if not self.is_first_loop_estimated:
             if self.local_time_vec[-1] > self.wait_time + self.listening_time:
                 self.latest_pos_loop = compute_signal_period_autocorrelation(
-                    pos_signal           = self.pos_signal,
-                    vel_signal           = self.vel_signal,
-                    local_time_vec         = self.local_time_vec,
-                    min_length_quasiperiod = self.min_length_quasiperiod)
+                    pos_signal               = self.pos_signal,
+                    vel_signal               = self.vel_signal,
+                    local_time_vec           = self.local_time_vec,
+                    min_duration_quasiperiod = self.min_duration_quasiperiod)
 
                 self.is_first_loop_estimated = True
                 self.look_ahead_range  = max(1, int(len(self.latest_pos_loop) * self.look_ahead_pcent  / 100))   # range_post is the number of points after the last nearest point on which estimate the new phase
                 self.look_behind_range = max(1, int(len(self.latest_pos_loop) * self.look_behind_pcent / 100))
 
-                if self.baseline_pos_loop is not None:  self.compute_phase_offset()   # TODO introduce a string mode_algorithm that can be tethered or un tethered. Should be put elsewhere
+                if self.is_use_baseline:  self.compute_phase_offset()   # TODO Should be put elsewhere
 
                 # estimate phase for the first loop
                 for i in range(len(self.latest_pos_loop), len(self.pos_signal) - 1):
@@ -117,6 +116,7 @@ class OnlineMultidimPhaseEstimator:
             self.look_behind_range = max(1, int(len(self.latest_pos_loop) * self.look_behind_pcent / 100))
 
         if self.curr_phase - self.prev_phase < -self.epsilon:   # a quasiperiodicity window ended
+            self.delimiter_time_instants.append(float(self.local_time_vec[-1] + self.initial_time))
             length_new_loop = self.idx_curr_time_loop + 1
             # if the difference in length between new loop and previous loop is smaller than the range set by user
             if abs(length_new_loop - len(self.latest_pos_loop)) < len(self.latest_pos_loop)*self.max_diff_len_new_loop_pcent/100:
@@ -131,7 +131,7 @@ class OnlineMultidimPhaseEstimator:
                 self.len_last_period_discarded = self.idx_curr_time_loop + 1
 
             # reinitialize new_loop
-            self.new_loop = np.zeros((self.max_length_loop, 6))
+            self.new_loop = np.zeros((self.max_length_loop, 2*self.n_dim))
             self.idx_curr_time_loop = 0
 
         # append current kinematics to new loop
@@ -170,8 +170,8 @@ class OnlineMultidimPhaseEstimator:
             squared_err_vel = loop_for_search.copy()
             for i in range(len(loop_for_search)):
                 tmp = (loop_for_search[i] - curr_kinematics) ** 2
-                squared_err_pos[i] = [1,1,1,0,0,0] * tmp
-                squared_err_vel[i] = [0,0,0,1,1,1] * tmp
+                squared_err_pos[i] = np.concatenate((np.ones(self.n_dim), np.zeros(self.n_dim))) * tmp
+                squared_err_vel[i] = np.concatenate((np.zeros(self.n_dim), np.ones(self.n_dim))) * tmp
             distances_pos = np.sqrt(np.sum((squared_err_pos), axis=1))  # position error norm
             distances_vel = np.sqrt(np.sum((squared_err_vel), axis=1))  # velocity error norm
             distances_pos = distances_pos/max(distances_pos)      # normalized position error norm
@@ -192,32 +192,33 @@ class OnlineMultidimPhaseEstimator:
 
     
     def compute_phase_offset(self) -> None:
-        x_axis = (self.point_2 - self.point_1) / np.linalg.norm(self.point_2 - self.point_1)
-        z_vector = self.point_3 - self.point_2
+        x_axis = (self.ref_frame_point_2 - self.ref_frame_point_1) / np.linalg.norm(self.ref_frame_point_2 - self.ref_frame_point_1)
+        z_vector = self.ref_frame_point_3 - self.ref_frame_point_2
         z_axis = z_vector - np.dot(z_vector, x_axis) * x_axis 
         z_axis = z_axis / np.linalg.norm(z_axis)  
         y_axis = np.cross(z_axis, x_axis)
         y_axis = y_axis / np.linalg.norm(y_axis)
         rotation_matrix = np.vstack([x_axis, y_axis, z_axis])
         
-        rotated_ref = np.dot(self.latest_pos_loop[:, 0:3], rotation_matrix.T)
-        
-        centroid = np.mean(rotated_ref, axis=0)
-        rotated_centered_ref = rotated_ref - centroid
+        rotated_loop = self.latest_pos_loop[:, 0:3] @ rotation_matrix.T
+        #rotated_loop = self.latest_pos_loop[:, 0:self.n_dim] @ np.kron(np.eye(int(self.n_dim/3)), rotation_matrix.T)
 
-        scale_factors = np.std(self.baseline_pos_loop, axis=0) / np.std(rotated_centered_ref, axis=0)
+        centroid = np.mean(rotated_loop, axis=0)
+        rotated_centered_loop = rotated_loop - centroid
+
+        scale_factors = np.std(self.baseline_pos_loop, axis=0) / np.std(rotated_centered_loop, axis=0)
         scale_factors[np.isnan(scale_factors)] = 1 
-        scaled_rotated_centered_ref = rotated_centered_ref * scale_factors
+        scaled_rotated_centered_loop = rotated_centered_loop * scale_factors
 
         time_step_baseline = 0.01
-        p = scaled_rotated_centered_ref[0, :]
-        vel=(scaled_rotated_centered_ref[1, :]-scaled_rotated_centered_ref[0, :])/self.step_time
-        vel_ref=np.gradient(self.baseline_pos_loop, np.arange(0, len(self.baseline_pos_loop) * time_step_baseline, time_step_baseline), axis=0)
+        p = scaled_rotated_centered_loop[0, :]
+        vel=(scaled_rotated_centered_loop[1, :]-scaled_rotated_centered_loop[0, :])/self.step_time
+        baseline_vel_loop = np.gradient(self.baseline_pos_loop, np.arange(0, len(self.baseline_pos_loop) * time_step_baseline, time_step_baseline), axis=0)
         position_norm = self.baseline_pos_loop.copy()
-        vel_norm = vel_ref.copy()
+        vel_norm = baseline_vel_loop.copy()
         for i in range(len(self.baseline_pos_loop)):
             position_norm[i] = (self.baseline_pos_loop[i] - p) ** 2
-            vel_norm[i] = (vel_ref[i] - vel) ** 2
+            vel_norm[i] = (baseline_vel_loop[i] - vel) ** 2
         distances_p = np.sqrt(np.sum((position_norm), axis=1))
         distances_v = np.sqrt(np.sum((vel_norm), axis=1))
         distances_p = distances_p/max(distances_p)

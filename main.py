@@ -11,36 +11,38 @@ from OnlineMultidimPhaseEstimator import OnlineMultidimPhaseEstimator
 # Parameters
 # ------------------------------------------------
 wait_time           = 1     # time interval before start phase computation [s]
-listening_time      = 10    # max first period interval [s]
-min_duration_period = 0     # min first period interval [s]
+min_duration_first_quasiperiod = 3  # [s]
+max_duration_first_quasiperiod = 5  # [s]
+listening_time      = 2*max_duration_first_quasiperiod    # [s] must contain 2 quasiperiods
 look_behind_pcent   = 0     # % of the last completed period before the last nearest point on which estimate the new phase
 look_ahead_pcent    = 25    # % of the last completed period after the last nearest point on which estimate the new phase
-file_path_estimand  = r"data\san_giovanni_2024-10-10\spiral_mc_2.csv"
-step_time           = 0.01  # [s]
-rows_to_skip_estimand = [0, 1, 2] + list(range(4, 40))
-col_names_pos_estimand               = ['TX.3', 'TY.3', 'TZ.3']
-col_names_ref_frame_estimand_point_1 = ['TX', 'TY', 'TZ']        # belly
-col_names_ref_frame_estimand_point_2 = ['TX.2', 'TY.2', 'TZ.2']  # right chest
-col_names_ref_frame_estimand_point_3 = ['TX.1', 'TY.1', 'TZ.1']  # left chest
+# file_path_estimand  = r"data\san_giovanni_2024-10-10\spiral_mc_1.csv"
+# step_time           = 0.01  # [s]
+# rows_to_skip_estimand = [0, 1, 2] + list(range(4, 40))
+# col_names_pos_estimand               = ['TX.3', 'TY.3', 'TZ.3']
+# col_names_ref_frame_estimand_point_1 = ['TX', 'TY', 'TZ']        # belly
+# col_names_ref_frame_estimand_point_2 = ['TX.2', 'TY.2', 'TZ.2']  # right chest
+# col_names_ref_frame_estimand_point_3 = ['TX.1', 'TY.1', 'TZ.1']  # left chest
 
 
 # file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX101_pelvic_balance_good.csv"; col_names_pos_estimand = ["HIP_R_X", "HIP_R_Y", "HIP_R_Z"]
-# file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX102_pelvic_balance_bad.csv"; col_names_pos_estimand = ["HIP_R_X", "HIP_R_Y", "HIP_R_Z"]
-# file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX201_superman_good.csv"; col_names_pos_estimand = ["HAN_R_X", "HAN_R_Y", "HAN_R_Z"]
-# file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX202_superman_bad.csv"; col_names_pos_estimand = ["HAN_R_X", "HAN_R_Y", "HAN_R_Z"]
+# file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX102_pelvic_balance_bad.csv"; col_names_pos_estimand = ["HIP_R_X", "HIP_R_Y", "HIP_R_Z", "HIP_L_X", "HIP_L_Y", "HIP_L_Z"]
+# file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX201_superman_good.csv"; col_names_pos_estimand = ["HAN_R_X", "HAN_R_Y", "HAN_R_Z", "HAN_L_X", "HAN_L_Y", "HAN_L_Z"]
+file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX202_superman_bad.csv"; col_names_pos_estimand = ["HAN_R_X", "HAN_R_Y", "HAN_R_Z", "HAN_L_X", "HAN_L_Y", "HAN_L_Z"]
 # file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX301_bridge_good.csv"; col_names_pos_estimand = ["HIP_R_X", "HIP_R_Y", "HIP_R_Z"]
 # file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX302_bridge_bad.csv"; col_names_pos_estimand = ["HIP_R_X", "HIP_R_Y", "HIP_R_Z"]
 # file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX401_plank_good.csv"; col_names_pos_estimand = ["PELVIS_X", "PELVIS_Y", "PELVIS_Z"]
 # file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX402_plank_bad.csv"; col_names_pos_estimand = ["PELVIS_X", "PELVIS_Y", "PELVIS_Z"]
-# step_time           = 0.01  # [s]
-# listening_time      = 30    # max first period interval [s]
+step_time           = 0.01  # [s]
+listening_time      = 30    # max first period interval [s]
 
-# rows_to_skip_estimand = list(range(0, 9))
+rows_to_skip_estimand = list(range(0, 9))
 
+is_use_baseline = False
 
-# col_names_ref_frame_estimand_point_1 = col_names_pos_estimand
-# col_names_ref_frame_estimand_point_2 = col_names_pos_estimand
-# col_names_ref_frame_estimand_point_3 = col_names_pos_estimand
+col_names_ref_frame_estimand_point_1 = col_names_pos_estimand[0:3]
+col_names_ref_frame_estimand_point_2 = col_names_pos_estimand[0:3]
+col_names_ref_frame_estimand_point_3 = col_names_pos_estimand[0:3]
 
 
 file_path_baseline  = r"data\san_giovanni_2024-10-10\spiral_ref.csv"
@@ -70,17 +72,20 @@ ref_frame_estimand_point_3 = np.array(df_estimand[col_names_ref_frame_estimand_p
 
 # Online estimator
 # ------------------------------------------------
+n_dim = len(col_names_pos_estimand)
 phase_estimator = OnlineMultidimPhaseEstimator(
+    n_dim               = n_dim,
     step_time           = step_time,
-    look_behind_pcent   = look_behind_pcent,
-    look_ahead_pcent    = look_ahead_pcent,
     wait_time           = wait_time,
     listening_time      = listening_time,
-    min_duration_period = min_duration_period,
+    min_duration_first_quasiperiod= min_duration_first_quasiperiod,
+    look_behind_pcent   = look_behind_pcent,
+    look_ahead_pcent    = look_ahead_pcent,
+    is_use_baseline     = is_use_baseline,
     baseline_pos_loop   = baseline_pos_loop,
-    ref_frame_point_1   = ref_frame_estimand_point_3,
+    ref_frame_point_1   = ref_frame_estimand_point_1,
     ref_frame_point_2   = ref_frame_estimand_point_2,
-    ref_frame_point_3   = ref_frame_estimand_point_1
+    ref_frame_point_3   = ref_frame_estimand_point_3
 )
 phase_estimand = np.full(len(estimand_pos_signal[:, 0]), None)
 for j in range(len(estimand_pos_signal[:, 0]) - 1):   # TODO rewrite with shape
@@ -102,6 +107,8 @@ phase = np.mod(phase, 2*np.pi)
 
 # Figure
 # ------------------------------------------------
+print(f"Delimiter time instants: {phase_estimator.delimiter_time_instants}")
+
 plt.figure(figsize=(10, 5))
 plt.plot(time_vec[int((listening_time + wait_time) / step_time) + 1:len(phase) - 900], phase[int((listening_time + wait_time) / step_time) + 1:len(phase) - 900], label='Phase offline')
 plt.plot(time_vec[int((listening_time + wait_time) / step_time) + 1:len(phase_estimand) - 900], phase_estimand[int((listening_time + wait_time) / step_time) + 1:len(phase) - 900], label='Phase online')
