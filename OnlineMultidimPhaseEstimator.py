@@ -4,16 +4,18 @@ from scipy.signal import find_peaks
 
 class OnlineMultidimPhaseEstimator:
     def __init__(self,
-                 step_time           = 0.01,
-                 look_behind_pcent   = 0,
-                 look_ahead_pcent    = 25,
-                 wait_time           = 5,
-                 listening_time      = 15,
-                 min_duration_period = None,
-                 baseline_pos_loop   = None,
-                 ref_frame_point_1   = None,
-                 ref_frame_point_2   = None,
-                 ref_frame_point_3   = None):
+                 n_dims: int,
+                 step_time                      = 0.01,
+                 wait_time                      = 5,
+                 listening_time                 = 15,
+                 min_duration_first_quasiperiod = None,
+                 look_behind_pcent              = 0,
+                 look_ahead_pcent               = 25,
+                 is_use_baseline                = False,
+                 baseline_pos_loop              = None,
+                 ref_frame_point_1              = None,
+                 ref_frame_point_2              = None,
+                 ref_frame_point_3              = None):
 
         # Initialization from arguments
         self.step_time                   = step_time      # [s]
@@ -53,8 +55,8 @@ class OnlineMultidimPhaseEstimator:
         self.look_ahead_range          = 0
         self.look_behind_range         = 0
 
-        if min_duration_period is not None:
-            self.min_length_quasiperiod = min_duration_period
+        if min_duration_first_quasiperiod is not None:
+            self.min_length_quasiperiod = min_duration_first_quasiperiod
         if baseline_pos_loop is not None:
             self.baseline_pos_loop=baseline_pos_loop.copy()
             if ref_frame_point_1 is not None and ref_frame_point_2 is not None and ref_frame_point_3 is not None:
@@ -83,7 +85,7 @@ class OnlineMultidimPhaseEstimator:
                     pos_signal           = self.pos_signal,
                     vel_signal           = self.vel_signal,
                     local_time_vec         = self.local_time_vec,
-                    min_length_quasiperiod = self.min_length_quasiperiod)
+                    min_duration_quasiperiod= self.min_length_quasiperiod)
 
                 self.is_first_loop_estimated = True
                 self.look_ahead_range  = max(1, int(len(self.latest_pos_loop) * self.look_ahead_pcent  / 100))   # range_post is the number of points after the last nearest point on which estimate the new phase

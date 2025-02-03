@@ -4,7 +4,7 @@ from scipy.signal import detrend, find_peaks
 
 threshold_acceptable_peaks_wrt_maximum_pcent = 20    # Acceptance range of autocorrelation peaks defined as a percentage of the maximum autocorrelation value.
 
-def compute_signal_period_autocorrelation(pos_signal, vel_signal, local_time_vec, min_length_quasiperiod) -> np.ndarray:
+def compute_signal_period_autocorrelation(pos_signal, vel_signal, local_time_vec, min_duration_quasiperiod) -> np.ndarray:
     n_dim = len(pos_signal[0])
     pos_signal_stacked    = np.vstack(pos_signal)  # time flows vertically
     vel_signal_stacked    = np.vstack(vel_signal)
@@ -16,7 +16,7 @@ def compute_signal_period_autocorrelation(pos_signal, vel_signal, local_time_vec
         autocorr_vecs_per_dim[i] = compute_autocorr_vec(detrend(pos_signal_unstacked[i]))
     autocorr_vec_tot = np.sum(np.array(autocorr_vecs_per_dim), axis=0)
 
-    idx_min_length = np.argmax(np.array(local_time_vec) > min_length_quasiperiod)  # argmax finds the first True
+    idx_min_length = np.argmax(np.array(local_time_vec) > min_duration_quasiperiod)  # argmax finds the first True
     autocorr_vec_tot[:idx_min_length] = autocorr_vec_tot[idx_min_length]
 
     autocorr_vec_tot = autocorr_vec_tot / np.max(np.abs(autocorr_vec_tot))
