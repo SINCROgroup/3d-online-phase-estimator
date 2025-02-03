@@ -14,7 +14,7 @@ discarded_time                 = 1      # [s] discarded at the beginning before 
 min_duration_first_quasiperiod = 0     # [s]
 listening_time                 = 10     # [s] waits this time before estimating first loop must contain 2 quasiperiods
 look_behind_pcent              = 0      # % of last completed loop before last nearest point on which estimate the new phase
-look_ahead_pcent               = 25     # % of last completed loop after  last nearest point on which estimate the new phase
+look_ahead_pcent                = 25     # % of last completed loop after  last nearest point on which estimate the new phase
 # is_use_baseline                = False  # True: tethered mode; False: untethered mode
 
 file_path_estimand  = r"data\san_giovanni_2024-10-10\spiral_mc_1.csv"
