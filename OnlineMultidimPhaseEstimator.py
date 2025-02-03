@@ -200,7 +200,7 @@ class OnlineMultidimPhaseEstimator:
         rotation_matrix = np.vstack([x_axis, y_axis, z_axis])
         
         rotated_loop = self.latest_pos_loop[:, 0:3] @ rotation_matrix.T
-        #rotated_loop = self.latest_pos_loop[:, 0:self.n_dim] @ np.kron(np.eye(int(self.n_dim/3)), rotation_matrix.T)
+        #rotated_loop = self.latest_pos_loop[:, 0:self.n_dim] @ np.kron(np.eye(int(self.n_dim/3)), rotation_matrix.T)  # TODO si può vare qualcosa per gestire il caso con più dimensioni in ingresso?
 
         centroid = np.mean(rotated_loop, axis=0)
         rotated_centered_loop = rotated_loop - centroid
