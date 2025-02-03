@@ -6,9 +6,9 @@ from scipy.signal import find_peaks
 
 class OnlineMultidimPhaseEstimator:
     def __init__(self,
-                 n_dims: int,
+                 n_dims_estimand_pos: int,
                  step_time                      = 0.01,
-                 wait_time                      = 5,
+                 discarded_time                 = 5,
                  listening_time                 = 15,
                  min_duration_first_quasiperiod = 1,
                  look_behind_pcent              = 0,
@@ -20,9 +20,9 @@ class OnlineMultidimPhaseEstimator:
                  ref_frame_point_3              = None):
 
         # Initialization from arguments
-        self.n_dim                       = n_dims
-        self.step_time                   = step_time      # [s]
-        self.wait_time                   = wait_time      # initial waiting time interval [s]
+        self.n_dim                       = n_dims_estimand_pos
+        self.step_time                   = step_time             # [s]
+        self.discarded_time              = discarded_time              # initial waiting time interval [s]
         self.listening_time              = listening_time # time interval in witch to estimate the first period [s]
         self.look_ahead_pcent            = look_ahead_pcent  # % of the last completed period before the last nearest point on which estimate the new phase
         self.look_behind_pcent           = look_behind_pcent # % of the last completed period after the last nearest point on which estimate the new phase
@@ -54,7 +54,7 @@ class OnlineMultidimPhaseEstimator:
         self.look_behind_range         = 0
 
         if is_use_baseline:
-            assert n_dims == 3, "Tethered mode can be used only with n_dim = 3"
+            assert n_dims_estimand_pos == 3, "Tethered mode can be used only with n_dim = 3"
             assert baseline_pos_loop is not None, "Tethered mode was required but baseline_pos_loop was not provided"
             assert ref_frame_point_1 is not None, "Tethered mode was required but ref_frame_point_1 was not provided"
             assert ref_frame_point_2 is not None, "Tethered mode was required but ref_frame_point_2 was not provided"
@@ -71,7 +71,7 @@ class OnlineMultidimPhaseEstimator:
 
         self.local_time_vec.append(curr_time - self.initial_time)
 
-        if  self.local_time_vec[-1] > self.wait_time:
+        if  self.local_time_vec[-1] > self.discarded_time:
             self.pos_signal.append(curr_pos)
             self.step_time = self.local_time_vec[-1] - self.local_time_vec[-2]
             self.vel_signal.append((curr_pos - self.prev_pos) / self.step_time)
@@ -79,7 +79,7 @@ class OnlineMultidimPhaseEstimator:
         self.prev_pos = curr_pos
                 
         if not self.is_first_loop_estimated:
-            if self.local_time_vec[-1] > self.wait_time + self.listening_time:
+            if self.local_time_vec[-1] > self.discarded_time + self.listening_time:
                 self.latest_pos_loop = compute_signal_period_autocorrelation(
                     pos_signal               = self.pos_signal,
                     vel_signal               = self.vel_signal,
