@@ -11,21 +11,22 @@ from OnlineMultidimPhaseEstimator import OnlineMultidimPhaseEstimator
 # Parameters
 # ------------------------------------------------
 discarded_time                 = 1      # [s] discarded at the beginning before estimation
-min_duration_first_quasiperiod = 3      # [s]
+min_duration_first_quasiperiod = 0     # [s]
 listening_time                 = 10     # [s] waits this time before estimating first loop must contain 2 quasiperiods
 look_behind_pcent              = 0      # % of last completed loop before last nearest point on which estimate the new phase
 look_ahead_pcent               = 25     # % of last completed loop after  last nearest point on which estimate the new phase
 # is_use_baseline                = False  # True: tethered mode; False: untethered mode
 
-is_use_baseline = True
 file_path_estimand  = r"data\san_giovanni_2024-10-10\spiral_mc_1.csv"
-step_time           = 0.01  # [s]
 rows_to_skip_estimand = [0, 1, 2] + list(range(4, 40))
-col_names_pos_estimand               = ['TX.3', 'TY.3', 'TZ.3']
+col_names_pos_estimand = ['TX.3', 'TY.3', 'TZ.3']
+step_time           = 0.01  # [s]
+is_use_baseline = True
+file_path_baseline  = r"data\san_giovanni_2024-10-10\spiral_ref.csv"
+col_names_pos_baseline = ['x', 'y', 'z']
 col_names_ref_frame_estimand_point_1 = ['TX', 'TY', 'TZ']        # belly
 col_names_ref_frame_estimand_point_2 = ['TX.2', 'TY.2', 'TZ.2']  # right chest
 col_names_ref_frame_estimand_point_3 = ['TX.1', 'TY.1', 'TZ.1']  # left chest
-file_path_baseline  = r"data\san_giovanni_2024-10-10\spiral_ref.csv"
 
 # file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX101_pelvic_balance_good.csv"; col_names_pos_estimand = ["HIP_R_X", "HIP_R_Y", "HIP_R_Z"]
 # file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX102_pelvic_balance_bad.csv"; col_names_pos_estimand = ["HIP_R_X", "HIP_R_Y", "HIP_R_Z", "HIP_L_X", "HIP_L_Y", "HIP_L_Z"]
@@ -52,7 +53,7 @@ time_vec = np.arange(0, step_time * len(df_estimand_pos), step_time)
 
 if is_use_baseline:
     df_baseline       = pd.read_csv(file_path_baseline)
-    baseline_pos_loop = np.array([df_baseline['x'], df_baseline['y'], df_baseline['z']]).T
+    baseline_pos_loop = np.array(df_baseline[col_names_pos_baseline])
 
     col_names_ref_frame_estimand_points = col_names_ref_frame_estimand_point_1 + col_names_ref_frame_estimand_point_2 + col_names_ref_frame_estimand_point_3
     first_idx_without_na = 0
@@ -82,9 +83,9 @@ phase_estimator = OnlineMultidimPhaseEstimator(
     look_ahead_pcent    = look_ahead_pcent,
     is_use_baseline     = is_use_baseline,
     baseline_pos_loop   = baseline_pos_loop,
-    ref_frame_point_1   = ref_frame_estimand_point_1,
+    ref_frame_point_1   = ref_frame_estimand_point_3,
     ref_frame_point_2   = ref_frame_estimand_point_2,
-    ref_frame_point_3   = ref_frame_estimand_point_3
+    ref_frame_point_3   = ref_frame_estimand_point_1
 )
 phase_estimand = np.full(len(estimand_pos_signal[:, 0]), None)
 for j in range(len(estimand_pos_signal[:, 0]) - 1):   # TODO rewrite with shape
