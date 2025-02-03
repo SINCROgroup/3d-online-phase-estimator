@@ -17,7 +17,7 @@ look_behind_pcent              = 0      # % of last completed loop before last n
 look_ahead_pcent               = 25     # % of last completed loop after  last nearest point on which estimate the new phase
 # is_use_baseline                = False  # True: tethered mode; False: untethered mode
 
-file_path_estimand  = r"data\san_giovanni_2024-10-10\spiral_mc_1.csv"
+file_path_estimand  = r"data\san_giovanni_2024-10-10\spiral_fdl_1.csv"
 rows_to_skip_estimand = [0, 1, 2] + list(range(4, 40))
 col_names_pos_estimand = ['TX.3', 'TY.3', 'TZ.3']
 step_time           = 0.01  # [s]
@@ -75,7 +75,7 @@ else:
 n_dims_estimand_pos = estimand_pos_signal.shape[1]
 n_time_instants     = estimand_pos_signal.shape[0]
 phase_estimator = OnlineMultidimPhaseEstimator(
-    n_dims_estimand_pos            = n_dims_estimand_pos,
+    n_dims_estimand_pos= n_dims_estimand_pos,
     # step_time                      = step_time,
     listening_time                 = listening_time,
     discarded_time                 = discarded_time,
