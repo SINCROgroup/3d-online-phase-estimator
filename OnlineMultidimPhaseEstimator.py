@@ -16,18 +16,20 @@ class OnlineMultidimPhaseEstimator:
                  look_ahead_pcent               = 25,
                  is_use_baseline                = False,
                  baseline_pos_loop              = None,
+                 time_step_baseline             = 0.01,
                  ref_frame_point_1              = None,
                  ref_frame_point_2              = None,
                  ref_frame_point_3              = None):
 
         # Initialization from arguments
-        self.n_dims                      = n_dims_estimand_pos
-        self.discarded_time              = discarded_time       # [s] discarded at the beginning before estimation
-        self.listening_time              = listening_time       # [s] waits this time before estimating first loop must contain 2 quasiperiods
-        self.look_ahead_pcent            = look_ahead_pcent     # % of last completed loop before last nearest point on which estimate the new phase
-        self.look_behind_pcent           = look_behind_pcent    # % of last completed loop after  last nearest point on which estimate the new phase
-        self.is_use_baseline             = is_use_baseline
-        self.min_duration_quasiperiod    = min_duration_first_quasiperiod # [s]
+        self.n_dims                    = n_dims_estimand_pos
+        self.discarded_time            = discarded_time       # [s] discarded at the beginning before estimation
+        self.listening_time            = listening_time       # [s] waits this time before estimating first loop must contain 2 quasiperiods
+        self.look_ahead_pcent          = look_ahead_pcent     # % of last completed loop before last nearest point on which estimate the new phase
+        self.look_behind_pcent         = look_behind_pcent    # % of last completed loop after  last nearest point on which estimate the new phase
+        self.is_use_baseline           = is_use_baseline
+        self.min_duration_quasiperiod  = min_duration_first_quasiperiod # [s]
+        self.time_step_baseline        = time_step_baseline
 
         self.curr_step_time = None
         self.initial_time = None
@@ -204,10 +206,9 @@ class OnlineMultidimPhaseEstimator:
         scale_factors[np.isnan(scale_factors)] = 1 
         scaled_rotated_centered_loop = rotated_centered_loop * scale_factors
 
-        time_step_baseline = 0.01      # TODO MC: we should avoid literals in methods
         curr_pos_ = scaled_rotated_centered_loop[0, :]
         curr_vel_ = (scaled_rotated_centered_loop[1, :] - scaled_rotated_centered_loop[0, :]) / self.curr_step_time
-        baseline_vel_loop = np.gradient(self.baseline_pos_loop, np.arange(0, len(self.baseline_pos_loop) * time_step_baseline, time_step_baseline), axis=0)
+        baseline_vel_loop = np.gradient(self.baseline_pos_loop, np.arange(0, len(self.baseline_pos_loop) * self.time_step_baseline, self.time_step_baseline), axis=0)
         index = compute_idx_min_distance(pos_signal = self.baseline_pos_loop.copy(),
                                          vel_signal = baseline_vel_loop.copy(),
                                          curr_pos   = curr_pos_,

@@ -20,8 +20,9 @@ look_ahead_pcent               = 25     # % of last completed loop after  last n
 file_path_estimand  = r"data\san_giovanni_2024-10-10\spiral_fdl_1.csv"
 rows_to_skip_estimand = [0, 1, 2] + list(range(4, 40))
 col_names_pos_estimand = ['TX.3', 'TY.3', 'TZ.3']
-step_time           = 0.01  # [s]
+time_step           = 0.01  # [s]
 is_use_baseline = True
+time_step_baseline  = 0.01
 file_path_baseline  = r"data\san_giovanni_2024-10-10\spiral_ref.csv"
 col_names_pos_baseline = ['x', 'y', 'z']
 col_names_ref_frame_estimand_point_1 = ['TX', 'TY', 'TZ']        # belly
@@ -49,7 +50,7 @@ df_estimand_pos = df_estimand[col_names_pos_estimand].copy()
 df_estimand_pos.ffill(inplace=True)
 estimand_pos_signal = np.array(df_estimand_pos)
 
-time_signal = np.arange(0, step_time * len(df_estimand_pos), step_time)
+time_signal = np.arange(0, time_step * len(df_estimand_pos), time_step)
 
 if is_use_baseline:
     df_baseline       = pd.read_csv(file_path_baseline)
@@ -75,8 +76,7 @@ else:
 n_dims_estimand_pos = estimand_pos_signal.shape[1]
 n_time_instants     = estimand_pos_signal.shape[0]
 phase_estimator = OnlineMultidimPhaseEstimator(
-    n_dims_estimand_pos= n_dims_estimand_pos,
-    # step_time                      = step_time,
+    n_dims_estimand_pos            = n_dims_estimand_pos,
     listening_time                 = listening_time,
     discarded_time                 = discarded_time,
     min_duration_first_quasiperiod = min_duration_first_quasiperiod,
@@ -84,6 +84,7 @@ phase_estimator = OnlineMultidimPhaseEstimator(
     look_ahead_pcent               = look_ahead_pcent,
     is_use_baseline                = is_use_baseline,
     baseline_pos_loop              = baseline_pos_loop,
+    time_step_baseline             = time_step_baseline,
     ref_frame_point_1              = ref_frame_estimand_point_3,
     ref_frame_point_2              = ref_frame_estimand_point_2,
     ref_frame_point_3              = ref_frame_estimand_point_1
@@ -104,8 +105,8 @@ principal_component_main = principal_components[:, 0]
 
 phase_estimand_offline = np.unwrap(np.angle(hilbert(principal_component_main)))
 
-initial_phase_estimand_online  = phase_estimand_online [int((listening_time + discarded_time) / step_time) + 1]   # + 1 necessary because, e.g., if listening_time + discarded_time = 4, we want to start at time = idx = 5
-initial_phase_estimand_offline = phase_estimand_offline[int((listening_time + discarded_time) / step_time) + 1]
+initial_phase_estimand_online  = phase_estimand_online [int((listening_time + discarded_time) / time_step) + 1]   # + 1 necessary because, e.g., if listening_time + discarded_time = 4, we want to start at time = idx = 5
+initial_phase_estimand_offline = phase_estimand_offline[int((listening_time + discarded_time) / time_step) + 1]
 phase_estimand_offline += initial_phase_estimand_online - initial_phase_estimand_offline
 
 phase_estimand_offline = np.mod(phase_estimand_offline, 2 * np.pi)
@@ -116,8 +117,8 @@ phase_estimand_offline = np.mod(phase_estimand_offline, 2 * np.pi)
 print(f"Delimiter time instants: {phase_estimator.delimiter_time_instants}")
 
 plt.figure(figsize=(10, 5))
-plt.plot(time_signal[int((listening_time + discarded_time) / step_time) + 1:len(phase_estimand_offline) - 900], phase_estimand_offline[int((listening_time + discarded_time) / step_time) + 1:len(phase_estimand_offline) - 900], label='Phase offline')
-plt.plot(time_signal[int((listening_time + discarded_time) / step_time) + 1:len(phase_estimand_online) - 900], phase_estimand_online[int((listening_time + discarded_time) / step_time) + 1:len(phase_estimand_offline) - 900], label='Phase online')
+plt.plot(time_signal[int((listening_time + discarded_time) / time_step) + 1:len(phase_estimand_offline) - 900], phase_estimand_offline[int((listening_time + discarded_time) / time_step) + 1:len(phase_estimand_offline) - 900], label='Phase offline')
+plt.plot(time_signal[int((listening_time + discarded_time) / time_step) + 1:len(phase_estimand_online) - 900], phase_estimand_online[int((listening_time + discarded_time) / time_step) + 1:len(phase_estimand_offline) - 900], label='Phase online')
 plt.title('Comparison online-offline estimation', fontsize=16)
 plt.xlabel('Time (s)', fontsize=14)
 plt.ylabel('Phase (radians)', fontsize=14)
