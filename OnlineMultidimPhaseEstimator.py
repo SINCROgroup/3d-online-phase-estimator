@@ -27,6 +27,7 @@ class OnlineMultidimPhaseEstimator:
         self.listening_time            = listening_time       # [s] waits this time before estimating first loop must contain 2 quasiperiods
         self.look_ahead_pcent          = look_ahead_pcent     # % of last completed loop before last nearest point on which estimate the new phase
         self.look_behind_pcent         = look_behind_pcent    # % of last completed loop after  last nearest point on which estimate the new phase
+        # TODO assert somma <= 100
         self.is_use_baseline           = is_use_baseline
         self.min_duration_quasiperiod  = min_duration_first_quasiperiod # [s]
         self.time_step_baseline        = time_step_baseline
@@ -69,7 +70,7 @@ class OnlineMultidimPhaseEstimator:
             self.ref_frame_point_3 = ref_frame_point_3.copy()
 
 
-    def compute_phase(self, curr_pos, curr_time) -> float:      # TODO rename to update phase?
+    def compute_phase(self, curr_pos, curr_time) -> float:      # TODO rename to update phase? (update_estimator)
         if not self.local_time_signal:  self.initial_time = curr_time  # initialize initial_time
         self.local_time_signal.append(curr_time - self.initial_time)
 
@@ -149,7 +150,7 @@ class OnlineMultidimPhaseEstimator:
     def compute_phase_internal(self, curr_kinematics):   # TODO bad name
         if self.is_first_loop_estimated:
             len_latest_loop = len(self.latest_pos_loop)
-            if self.idx_curr_phase_in_latest_loop - self.look_behind_range < 1:   # TODO why not < 0?
+            if self.idx_curr_phase_in_latest_loop - self.look_behind_range < 1:   # TODO why not < 0? OK
                 #    loop: [part_1 - - - - - - - - part_2]
                 loop_part_1 = self.latest_pos_loop[0 : self.idx_curr_phase_in_latest_loop + self.look_ahead_range]      # TODO couldn't we find a way to define the idxs first and, with them, the loop parts?
                 loop_part_2 = self.latest_pos_loop[len_latest_loop - self.look_behind_range + self.idx_curr_phase_in_latest_loop : len_latest_loop]
@@ -247,8 +248,7 @@ def compute_loop_with_autocorrelation(pos_signal, vel_signal, local_time_vec, mi
     peaks_values = autocorr_vec_tot[peaks[np.where(peaks > idx_min_length)]]
     lower_bound_acceptable_peaks_values = max(peaks_values) - (
                 max(peaks_values) * threshold_acceptable_peaks_wrt_maximum_pcent / 100)
-    idxs_possible_period = np.where(peaks_values > lower_bound_acceptable_peaks_values)[
-        0]  # indexing necessary because np.where returns a tuple containing an array
+    idxs_possible_period = np.where(peaks_values > lower_bound_acceptable_peaks_values)[0]  # indexing necessary because np.where returns a tuple containing an array
     assert len(idxs_possible_period) > 0, "No valid first loop was found, try increasing the listening time."
     idx_start_loop = 0
     idx_end_loop = peaks[idxs_possible_period][0]
