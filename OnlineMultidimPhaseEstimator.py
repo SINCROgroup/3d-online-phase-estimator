@@ -147,31 +147,29 @@ class OnlineMultidimPhaseEstimator:
             self.idx_curr_time_loop += 1
 
 
-    def compute_phase_internal(self, curr_kinematics):   # TODO bad name
+    def compute_phase_internal(self, curr_kinematics):   
         if self.is_first_loop_estimated:
             len_latest_loop = len(self.latest_pos_loop)
-            if self.idx_curr_phase_in_latest_loop - self.look_behind_range < 1:   # TODO why not < 0? OK
+            if self.idx_curr_phase_in_latest_loop - self.look_behind_range < 0:
                 #    loop: [part_1 - - - - - - - - part_2]
-                loop_part_1 = self.latest_pos_loop[0 : self.idx_curr_phase_in_latest_loop + self.look_ahead_range]      # TODO couldn't we find a way to define the idxs first and, with them, the loop parts?
-                loop_part_2 = self.latest_pos_loop[len_latest_loop - self.look_behind_range + self.idx_curr_phase_in_latest_loop : len_latest_loop]
-                loop_for_search = np.vstack((loop_part_1, loop_part_2))
-
-                idxs_part_1 = np.arange(1, self.idx_curr_phase_in_latest_loop + self.look_ahead_range + 1)  # TODO: MC: I don't get why we have all these +1
-                idxs_part_2 = np.arange(len_latest_loop - self.look_behind_range + self.idx_curr_phase_in_latest_loop, len_latest_loop + 1)  # TODO MD: ditto
+                idxs_part_1 = np.arange(0, self.idx_curr_phase_in_latest_loop + self.look_ahead_range) 
+                idxs_part_2 = np.arange(len_latest_loop - self.look_behind_range + self.idx_curr_phase_in_latest_loop, len_latest_loop) 
                 idxs_loop_for_search = np.concatenate((idxs_part_1, idxs_part_2))
+                loop_for_search = self.latest_pos_loop[idxs_loop_for_search]
+  
             elif self.idx_curr_phase_in_latest_loop + self.look_ahead_range > len_latest_loop:
                 #    loop: [part_2 - - - - - - - - part_1]
-                loop_part_1 = self.latest_pos_loop[self.idx_curr_phase_in_latest_loop - self.look_behind_range:len_latest_loop]
-                loop_part_2 = self.latest_pos_loop[0:self.idx_curr_phase_in_latest_loop + self.look_ahead_range - len_latest_loop]
-                loop_for_search = np.vstack((loop_part_1, loop_part_2))
+                idxs_part_1 = np.arange(self.idx_curr_phase_in_latest_loop - self.look_behind_range, len_latest_loop)    
+                idxs_part_2 = np.arange(0, self.idx_curr_phase_in_latest_loop + self.look_ahead_range - len_latest_loop) 
+                idxs_loop_for_search = np.concatenate((idxs_part_1, idxs_part_2))   
+                loop_for_search = [idxs_loop_for_search]
 
-                idxs_part_1 = np.arange(self.idx_curr_phase_in_latest_loop - self.look_behind_range, len_latest_loop + 1)      # TODO: MC: I don't get why we have all these +1
-                idxs_part_2 = np.arange(1, self.idx_curr_phase_in_latest_loop + self.look_ahead_range - len_latest_loop + 1)   # TODO: MC: I don't get why we have all these +1
-                idxs_loop_for_search = np.concatenate((idxs_part_1, idxs_part_2))
+
             else:
                 #   loop: [- - - - - - single part - - - - -]
-                loop_for_search = self.latest_pos_loop[self.idx_curr_phase_in_latest_loop - self.look_behind_range: self.idx_curr_phase_in_latest_loop + self.look_ahead_range]      # TODO in this method, it seems that we could first define the indexes, ant then use them to define loop_for_search
-                idxs_loop_for_search = np.arange(      self.idx_curr_phase_in_latest_loop - self.look_behind_range, self.idx_curr_phase_in_latest_loop + self.look_ahead_range + 1)
+                idxs_loop_for_search = np.arange(self.idx_curr_phase_in_latest_loop - self.look_behind_range, self.idx_curr_phase_in_latest_loop + self.look_ahead_range)
+                loop_for_search = [idxs_loop_for_search]
+                
 
             index_min_distance = compute_idx_min_distance(pos_signal = loop_for_search[:, 0:self.n_dims].copy(),
                                                           vel_signal = loop_for_search[:, self.n_dims:].copy(),
