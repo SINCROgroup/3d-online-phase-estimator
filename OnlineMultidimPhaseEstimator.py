@@ -43,7 +43,6 @@ class OnlineMultidimPhaseEstimator:
         self.prev_phase                    = None
         self.idx_curr_time_loop            = 0    #TODO can remove initialization?
         self.idx_curr_phase_in_latest_loop = 0
-        self.prev_pos = np.zeros(self.n_dims)
 
         self.max_length_loop         = 10000
         self.latest_pos_loop         = None
@@ -53,6 +52,7 @@ class OnlineMultidimPhaseEstimator:
         self.vel_signal              = []
         self.local_time_signal       = []
         self.delimiter_time_instants = []
+        self.phase_signal            = []
 
         self.len_last_period_discarded = 0   # TODO move this?
         self.look_ahead_range          = 0
@@ -178,8 +178,6 @@ class OnlineMultidimPhaseEstimator:
             self.curr_phase = (2 * np.pi * self.idx_curr_phase_in_latest_loop) / len_latest_loop
             if self.curr_phase - self.prev_phase > self.phase_jump_for_loop_detection:  # Avoid 0 to 2pi jumps
                  self.curr_phase = self.prev_phase
-            if 0 > self.curr_phase - self.prev_phase > - self.phase_jump_for_loop_detection:   # avoid going backward  # TODO MC: then why do have look_behind if this is hard-coded?
-                self.curr_phase = self.prev_phase
 
         else:
             self.prev_phase = 0   # TODO: maybe it's better to return None when we cannot estimate phase. Also this function could just have an assert, and the logic is managed in the caller
