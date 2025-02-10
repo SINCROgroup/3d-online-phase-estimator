@@ -21,13 +21,14 @@ class OnlineMultidimPhaseEstimator:
                  ref_frame_point_2              = None,
                  ref_frame_point_3              = None):
 
+        assert look_ahead_pcent + look_behind_pcent <= 100, "look_ahead_pcent + look_behind_pcent must not exceed 100"
+
         # Initialization from arguments
         self.n_dims                    = n_dims_estimand_pos
         self.discarded_time            = discarded_time       # [s] discarded at the beginning before estimation
         self.listening_time            = listening_time       # [s] waits this time before estimating first loop must contain 2 quasiperiods
         self.look_ahead_pcent          = look_ahead_pcent     # % of last completed loop before last nearest point on which estimate the new phase
         self.look_behind_pcent         = look_behind_pcent    # % of last completed loop after last nearest point on which estimate the new phase
-        assert look_ahead_pcent + look_behind_pcent <= 100, "look_ahead_pcent + look_behind_pcent must not exceed 100"
         self.is_use_baseline           = is_use_baseline
         self.min_duration_quasiperiod  = min_duration_first_quasiperiod # [s]
         self.time_step_baseline        = time_step_baseline
@@ -70,7 +71,7 @@ class OnlineMultidimPhaseEstimator:
             self.ref_frame_point_3 = ref_frame_point_3.copy()
 
 
-    def compute_phase(self, curr_pos, curr_time) -> float:      # TODO rename to update phase? (update_estimator)
+    def update_estimator(self, curr_pos, curr_time) -> float:
         if not self.local_time_signal:  self.initial_time = curr_time  # initialize initial_time
         self.local_time_signal.append(curr_time - self.initial_time)
 
@@ -102,12 +103,12 @@ class OnlineMultidimPhaseEstimator:
                     # estimate phase for the first loop
                     for i in range(len(self.latest_pos_loop), len(self.pos_signal) - 1):
                         curr_kinematics = np.concatenate((self.pos_signal[i], self.vel_signal[i]))
-                        self.compute_phase_internal(curr_kinematics)
+                        self.compute_phase(curr_kinematics)
                         self.update_latest_loop(curr_kinematics)
         else:
             curr_kinematics = np.zeros(2 * self.n_dims)
 
-        self.compute_phase_internal(curr_kinematics)   # TODO it would be better if these final steps could be integrated in the previous logic
+        self.compute_phase(curr_kinematics)   # TODO it would be better if these final steps could be integrated in the previous logic
 
         if self.is_first_loop_estimated:  self.update_latest_loop(curr_kinematics)
 
@@ -147,7 +148,7 @@ class OnlineMultidimPhaseEstimator:
             self.idx_curr_time_loop += 1
 
 
-    def compute_phase_internal(self, curr_kinematics):   
+    def compute_phase(self, curr_kinematics):
         if self.is_first_loop_estimated:
             len_latest_loop = len(self.latest_pos_loop)
             if self.idx_curr_phase_in_latest_loop - self.look_behind_range < 0:

@@ -91,7 +91,7 @@ phase_estimator = OnlineMultidimPhaseEstimator(
 )
 phase_estimand_online = np.full(n_time_instants, None)
 for i_t in range(n_time_instants - 1):
-    phase_estimand_online[i_t] = phase_estimator.compute_phase(estimand_pos_signal[i_t, :], time_signal[i_t])
+    phase_estimand_online[i_t] = phase_estimator.update_estimator(estimand_pos_signal[i_t, :], time_signal[i_t])
 
 
 # Offline estimator
