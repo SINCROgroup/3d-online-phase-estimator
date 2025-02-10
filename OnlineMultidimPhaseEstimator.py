@@ -161,11 +161,11 @@ class OnlineMultidimPhaseEstimator:
                 idxs_part_1 = np.arange(self.idx_curr_phase_in_latest_loop - self.look_behind_range, len_latest_loop)    
                 idxs_part_2 = np.arange(0, self.idx_curr_phase_in_latest_loop + self.look_ahead_range - len_latest_loop) 
                 idxs_loop_for_search = np.concatenate((idxs_part_1, idxs_part_2))   
-                loop_for_search = [idxs_loop_for_search]
+                loop_for_search = self.latest_pos_loop[idxs_loop_for_search]
             else:
                 #   loop: [- - - - - - single part - - - - -]
                 idxs_loop_for_search = np.arange(self.idx_curr_phase_in_latest_loop - self.look_behind_range, self.idx_curr_phase_in_latest_loop + self.look_ahead_range)
-                loop_for_search = [idxs_loop_for_search]
+                loop_for_search = self.latest_pos_loop[idxs_loop_for_search]
 
             index_min_distance = compute_idx_min_distance(pos_signal = loop_for_search[:, 0:self.n_dims].copy(),
                                                           vel_signal = loop_for_search[:, self.n_dims:].copy(),
