@@ -48,8 +48,6 @@ class OnlineMultidimPhaseEstimator:
 
         # Attributes not tunable by caller
         self.phase_jump_for_loop_detection = np.pi
-        # self.max_diff_len_new_loop_pcent   = 30             # difference in length of the new reference (vector length) compared to the old one, expressed as a percentage of the old length, is accepted.
-        self.max_length_loop               = 10000
 
         # Initial values
         self.active_mode             = "sleeping"
@@ -61,29 +59,28 @@ class OnlineMultidimPhaseEstimator:
         self.delimiter_time_instants = []
         self.local_phase_signal      = []  # local:  without offset
         self.global_phase_signal     = []  # global: with offset
-
-        self.curr_idx_in_new_loop            = 0
+        self.new_loop                = []
         self.idx_curr_phase_in_latest_loop = 0
-        self.latest_pos_loop               = None
-        self.new_loop                      = np.zeros((self.max_length_loop, 2*self.n_dims))   # TODO make this something which is appended each time?
-        # self.len_last_period_discarded     = 0
 
+
+    def update_pos_vel(self, curr_pos) -> None:
+        self.pos_signal.append(curr_pos)
+        if len(self.pos_signal) >= 2:
+            curr_step_time = self.local_time_signal[-1] - self.local_time_signal[-2]
+            self.vel_signal.append((self.pos_signal[-1] - self.pos_signal[-2]) / curr_step_time)
+        else:                          self.vel_signal.append(np.zeros(self.n_dims))
 
     def get_kinematics(self, idx:int) -> np.ndarray:
         return np.concatenate((self.pos_signal[idx], self.vel_signal[idx]))
+
 
     def update_look_ranges(self) -> None:
         self.look_ahead_range  = int(len(self.latest_pos_loop) * self.look_ahead_pcent  / 100)
         self.look_behind_range = int(len(self.latest_pos_loop) * self.look_behind_pcent / 100)
 
-    def update_estimator(self, curr_pos, curr_time) -> float:
 
-        def update_pos_vel() -> None:
-            self.pos_signal.append(curr_pos)
-            if len(self.pos_signal) >= 2:
-                curr_step_time = self.local_time_signal[-1] - self.local_time_signal[-2]
-                self.vel_signal.append((self.pos_signal[-1] - self.pos_signal[-2]) / curr_step_time)
-            else:                          self.vel_signal.append(np.zeros(self.n_dims))
+    # This is the main cycle perfomerd at each time instant
+    def update_estimator(self, curr_pos, curr_time) -> float:
 
         if not self.local_time_signal:  self.initial_time = curr_time  # initialize initial_time
         self.local_time_signal.append(curr_time - self.initial_time)
@@ -102,11 +99,11 @@ class OnlineMultidimPhaseEstimator:
                 return None
 
             case "listening":
-                update_pos_vel()
+                self.update_pos_vel(curr_pos)
                 return None
 
             case "estimating":
-                update_pos_vel()
+                self.update_pos_vel(curr_pos)
 
                 if not self.is_first_loop_estimated:
                     self.latest_pos_loop = compute_loop_with_autocorrelation(
@@ -132,48 +129,25 @@ class OnlineMultidimPhaseEstimator:
                     idx_prev_instant = len(self.pos_signal) - 2
                     self.compute_phase(self.get_kinematics(idx_first_instant_of_second_loop))
                     # in first instant of second loop you don't check whether to update the loop
-                    self.append_kinem_to_new_loop(self.get_kinematics(idx_first_instant_of_second_loop))
+                    self.new_loop.append(self.get_kinematics(idx_first_instant_of_second_loop))
                     for idx_scanning in range(idx_first_instant_of_second_loop+1, idx_prev_instant+1):   # recall: range excludes end point
                         self.compute_phase(self.get_kinematics(idx_scanning))
                         self.possibly_update_latest_loop(self.local_time_signal[idx_scanning + self.idx_time_start_listening] + self.initial_time)
-                        self.append_kinem_to_new_loop(self.get_kinematics(idx_scanning))
+                        self.new_loop.append(self.get_kinematics(idx_scanning))
 
                 # Estimate phase at current time
                 self.compute_phase(self.get_kinematics(-1))
                 self.possibly_update_latest_loop(curr_time)
-                self.append_kinem_to_new_loop(self.get_kinematics(-1))
+                self.new_loop.append(self.get_kinematics(-1))
                 return self.global_phase_signal[-1]
 
 
-    def append_kinem_to_new_loop(self, curr_kinematics):
-        try:
-            self.new_loop[self.curr_idx_in_new_loop, :] = curr_kinematics
-            self.curr_idx_in_new_loop += 1
-        except IndexError:  raise IndexError("max_length_loop is too small.")
-
-
     def possibly_update_latest_loop(self, curr_time):
-            if self.local_phase_signal[-1] - self.local_phase_signal[-2] < - self.phase_jump_for_loop_detection:   # a quasiperiodicity window ended  # TODO MC: this check could be done in the caller
+            if self.local_phase_signal[-1] - self.local_phase_signal[-2] < - self.phase_jump_for_loop_detection:   # a quasiperiodicity window ended
                 self.delimiter_time_instants.append(float(curr_time))
-                self.latest_pos_loop = self.new_loop[0:self.curr_idx_in_new_loop, :]
+                self.latest_pos_loop = np.vstack(self.new_loop)
                 self.update_look_ranges()
-
-                # length_new_loop = self.curr_idx_in_new_loop + 1
-                # # if the difference in length between new loop and previous loop is smaller than the range set by user
-                # if abs(length_new_loop - len(self.latest_pos_loop)) < len(self.latest_pos_loop)*self.max_diff_len_new_loop_pcent/100:
-                #     self.latest_pos_loop = self.new_loop[0:self.curr_idx_in_new_loop, :]
-                #     self.update_look_ranges()
-                # # if the difference in length between new loop and previous discarded loop is smaller than the range set by user
-                # elif abs(length_new_loop - self.len_last_period_discarded) < self.len_last_period_discarded*self.max_diff_len_new_loop_pcent/100:
-                #     self.latest_pos_loop = self.new_loop[0:self.curr_idx_in_new_loop, :]
-                #     self.update_look_ranges()
-                #     self.len_last_period_discarded = 0
-                # else:
-                #     self.len_last_period_discarded = self.curr_idx_in_new_loop + 1
-
-                # Reinitialize new_loop
-                self.new_loop = np.zeros((self.max_length_loop, 2*self.n_dims))
-                self.curr_idx_in_new_loop = 0
+                self.new_loop = []         # reinitialize new_loop
 
 
     def compute_phase(self, curr_kinematics):
