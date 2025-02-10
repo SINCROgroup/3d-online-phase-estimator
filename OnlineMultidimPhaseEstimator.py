@@ -49,7 +49,7 @@ class OnlineMultidimPhaseEstimator:
         # Attributes not tunable by caller
         self.phase_jump_for_loop_detection = np.pi
         self.max_diff_len_new_loop_pcent   = 30             # difference in length of the new reference (vector length) compared to the old one, expressed as a percentage of the old length, is accepted. # TODO really neded?
-        self.max_length_loop         = 10000
+        self.max_length_loop               = 10000
 
         # Initial values
         self.active_mode             = "sleeping"
@@ -57,7 +57,6 @@ class OnlineMultidimPhaseEstimator:
 
         self.pos_signal              = []
         self.vel_signal              = []
-        self.kinematics_signal       = []
         self.local_time_signal       = []
         self.delimiter_time_instants = []
         self.local_phase_signal      = []  # local:  without offset
@@ -65,14 +64,17 @@ class OnlineMultidimPhaseEstimator:
 
         self.idx_curr_time_loop            = 0
         self.idx_curr_phase_in_latest_loop = 0
-        self.latest_pos_loop         = None
-        self.new_loop                = np.zeros((self.max_length_loop, 2*self.n_dims))   # TODO make this something which is appended each time?
-        self.len_last_period_discarded = 0   # TODO move this?
+        self.latest_pos_loop               = None
+        self.new_loop                      = np.zeros((self.max_length_loop, 2*self.n_dims))   # TODO make this something which is appended each time?
+        self.len_last_period_discarded     = 0   # TODO move this?
 
 
     def get_kinematics(self, idx:int) -> np.ndarray:
         return np.concatenate((self.pos_signal[idx], self.vel_signal[idx]))
 
+    def update_look_ranges(self) -> None:
+        self.look_ahead_range  = int(len(self.latest_pos_loop) * self.look_ahead_pcent  / 100)
+        self.look_behind_range = int(len(self.latest_pos_loop) * self.look_behind_pcent / 100)
 
     def update_estimator(self, curr_pos, curr_time) -> float:
 
@@ -89,8 +91,10 @@ class OnlineMultidimPhaseEstimator:
         # Update active mode
         if self.active_mode == "sleeping" and self.local_time_signal[-1] >= self.discarded_time:
             self.active_mode = "listening"
+            self.idx_time_start_listening = len(self.local_time_signal)-1
         if self.active_mode == "listening" and self.local_time_signal[-1] > self.discarded_time + self.listening_time:
             self.active_mode = "estimating"
+            # self.idx_time_start_estimating = len(self.local_time_signal)
  
         # Update estimator according to active mode
         match self.active_mode:
@@ -110,25 +114,25 @@ class OnlineMultidimPhaseEstimator:
                         vel_signal=self.vel_signal,
                         local_time_vec=self.local_time_signal,
                         min_duration_quasiperiod=self.min_duration_quasiperiod)
+                    self.update_look_ranges()
+
+                    self.delimiter_time_instants.append(self.local_time_signal[len(self.latest_pos_loop) + self.idx_time_start_listening] + self.initial_time)
                     self.is_first_loop_estimated = True
-                    
-                    self.look_ahead_range  = int(len(self.latest_pos_loop) * self.look_ahead_pcent / 100)  # range_post is the number of points after the last nearest point on which estimate the new phase
-                    self.look_behind_range = int(len(self.latest_pos_loop) * self.look_behind_pcent / 100)
-    
+
                     if self.is_use_baseline:  self.compute_phase_offset()
     
-                    # phases in first loop
-                    local_phases_first_loop = np.linspace(0, 2 * np.pi, len(self.latest_pos_loop))
+                    # Compute phases in first loop
+                    local_phases_first_loop  = np.linspace(0, 2 * np.pi, len(self.latest_pos_loop))
                     global_phases_first_loop = np.mod(local_phases_first_loop + self.phase_offset, 2 * np.pi)
-                    self.local_phase_signal = self.local_phase_signal + local_phases_first_loop.tolist()
-                    self.global_phase_signal = self.global_phase_signal + (
-                                global_phases_first_loop + self.phase_offset).tolist()
+                    self.local_phase_signal  = self.local_phase_signal + local_phases_first_loop.tolist()
+                    self.global_phase_signal = self.global_phase_signal + (global_phases_first_loop + self.phase_offset).tolist()
     
-                    # phase between first loop and current time
+                    # Estimate phases between first loop and current time
                     for i in range(len(self.latest_pos_loop), len(self.pos_signal) - 1):
                         self.compute_phase(self.get_kinematics(i))
                         self.update_latest_loop(self.get_kinematics(i))
 
+                # Estimate phase at current time
                 self.compute_phase(self.get_kinematics(-1))
                 self.update_latest_loop(self.get_kinematics(-1))
                 return self.global_phase_signal[-1]
@@ -137,22 +141,19 @@ class OnlineMultidimPhaseEstimator:
     def update_latest_loop(self, curr_kinematics): # updates the vector of the last loop when the phase completes a full cycle.
         """checks whether it is necessary to update the latest loop, and, if so, does it"""
 
-        def update_latest_loop_and_ranges() -> None:
-            self.latest_pos_loop   = self.new_loop[0:self.idx_curr_time_loop, :]
-            self.look_ahead_range  = max(1, int(len(self.latest_pos_loop) * self.look_ahead_pcent  / 100))
-            self.look_behind_range = max(1, int(len(self.latest_pos_loop) * self.look_behind_pcent / 100))
-
         if len(self.local_phase_signal) > 1 and self.local_phase_signal[-2] is not None:
-            if self.local_phase_signal[-1] - self.local_phase_signal[-2] < -self.phase_jump_for_loop_detection:   # a quasiperiodicity window ended  # TODO MC: this check could be done in the caller
+            if self.local_phase_signal[-1] - self.local_phase_signal[-2] < - self.phase_jump_for_loop_detection:   # a quasiperiodicity window ended  # TODO MC: this check could be done in the caller
                 self.delimiter_time_instants.append(float(self.local_time_signal[-1] + self.initial_time))
                 length_new_loop = self.idx_curr_time_loop + 1
                 # if the difference in length between new loop and previous loop is smaller than the range set by user
                 if abs(length_new_loop - len(self.latest_pos_loop)) < len(self.latest_pos_loop)*self.max_diff_len_new_loop_pcent/100:
-                    update_latest_loop_and_ranges()
+                    self.latest_pos_loop = self.new_loop[0:self.idx_curr_time_loop, :]
+                    self.update_look_ranges()
 
                 # if the difference in length between new loop and previous discarded loop is smaller than the range set by user   # TODO MC: I don't get the rationale behind this logic
                 elif abs(length_new_loop - self.len_last_period_discarded) < self.len_last_period_discarded*self.max_diff_len_new_loop_pcent/100:
-                    update_latest_loop_and_ranges()
+                    self.latest_pos_loop = self.new_loop[0:self.idx_curr_time_loop, :]
+                    self.update_look_ranges()
                     self.len_last_period_discarded = 0
 
                 else:
@@ -163,9 +164,11 @@ class OnlineMultidimPhaseEstimator:
                 self.idx_curr_time_loop = 0
 
         # append current kinematics to new loop
-        if self.idx_curr_time_loop < self.max_length_loop:
+        try:
             self.new_loop[self.idx_curr_time_loop, :] = curr_kinematics
             self.idx_curr_time_loop += 1
+        except IndexError:
+            raise IndexError("max_length_loop is too small.")
 
 
     def compute_phase(self, curr_kinematics):
