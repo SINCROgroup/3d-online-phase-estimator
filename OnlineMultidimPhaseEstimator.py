@@ -33,7 +33,6 @@ class OnlineMultidimPhaseEstimator:
         self.min_duration_quasiperiod  = min_duration_first_quasiperiod # [s]
         self.time_step_baseline        = time_step_baseline
 
-        self.curr_step_time = None
         self.initial_time = None
         self.active_mode = "sleeping"
         self.max_diff_len_new_loop_pcent   = 30             # difference in length of the new reference (vector length) compared to the old one, expressed as a percentage of the old length, is accepted. # TODO really neded?
@@ -49,9 +48,11 @@ class OnlineMultidimPhaseEstimator:
 
         self.pos_signal              = []
         self.vel_signal              = []
+        self.kinematics_signal       = []
         self.local_time_signal       = []
         self.delimiter_time_instants = []
-        self.phase_signal            = []
+        self.local_phase_signal      = []  # local:  without offset
+        self.global_phase_signal     = []  # global: with offset
 
         self.len_last_period_discarded = 0   # TODO move this?
         self.look_ahead_range          = 0
@@ -71,51 +72,60 @@ class OnlineMultidimPhaseEstimator:
 
 
     def update_estimator(self, curr_pos, curr_time) -> float:
+        def update_pos_vel_kinem() -> None:
+            self.pos_signal.append(curr_pos)
+            if len(self.pos_signal) >= 2:
+                curr_step_time = self.local_time_signal[-1] - self.local_time_signal[-2]
+                self.vel_signal.append((self.pos_signal[-1] - self.pos_signal[-2]) / curr_step_time)
+            else:                          self.vel_signal.append(np.zeros(self.n_dims))
+            self.kinematics_signal.append(np.concatenate((self.pos_signal[-1], self.vel_signal[-1])))
+
         if not self.local_time_signal:  self.initial_time = curr_time  # initialize initial_time
         self.local_time_signal.append(curr_time - self.initial_time)
 
-        # TODO MC: mi sembra che questa funzione dovrebbe essere divisa in due parti, la prima aggiorna lo stato, tra "sleeping", "listening" e "estimating"
-        # la seconda parte agisce in base in base allo stato corrente (struttura match case), la funzione diventa "update_estimator", la fase diventa un vettore interamente accessibile
+        # Update active mode
+        if self.active_mode == "sleeping" and self.local_time_signal[-1] > self.discarded_time:
+            self.active_mode = "listening"
+        if self.active_mode == "listening" and self.local_time_signal[-1] > self.discarded_time + self.listening_time:
+            self.active_mode = "estimating"
+            # compute first loop (run only once)
+            self.latest_pos_loop = compute_loop_with_autocorrelation(
+                pos_signal=self.pos_signal,
+                vel_signal=self.vel_signal,
+                local_time_vec=self.local_time_signal,
+                min_duration_quasiperiod=self.min_duration_quasiperiod)
 
-        if  self.local_time_signal[-1] > self.discarded_time:
-            #  update position and velocity
-            self.curr_step_time = self.local_time_signal[-1] - self.local_time_signal[-2]
-            self.pos_signal.append(curr_pos)
-            if len(self.pos_signal) >= 2:  self.vel_signal.append((self.pos_signal[-1] - self.pos_signal[-2]) / self.curr_step_time)
-            else:  self.vel_signal.append(np.zeros(self.n_dims))
-            curr_kinematics = np.concatenate((self.pos_signal[-1], self.vel_signal[-1]))
+            self.look_ahead_range = int(
+                len(self.latest_pos_loop) * self.look_ahead_pcent / 100)  # range_post is the number of points after the last nearest point on which estimate the new phase
+            self.look_behind_range = int(len(self.latest_pos_loop) * self.look_behind_pcent / 100)
 
-            if self.local_time_signal[-1] > self.discarded_time + self.listening_time:
-                if not self.is_first_loop_estimated:
-                    self.latest_pos_loop = compute_loop_with_autocorrelation(
-                        pos_signal               = self.pos_signal,
-                        vel_signal               = self.vel_signal,
-                        local_time_vec           = self.local_time_signal,
-                        min_duration_quasiperiod = self.min_duration_quasiperiod)
+            if self.is_use_baseline:  self.compute_phase_offset()
 
-                    self.is_first_loop_estimated = True
-                    self.look_ahead_range  = int(len(self.latest_pos_loop) * self.look_ahead_pcent  / 100)   # range_post is the number of points after the last nearest point on which estimate the new phase
-                    self.look_behind_range = int(len(self.latest_pos_loop) * self.look_behind_pcent / 100)
+            # estimate phase for the first loop
+            for i in range(len(self.latest_pos_loop), len(self.pos_signal) - 1):
+                self.kinematics_signal.append(np.concatenate((self.pos_signal[i], self.vel_signal[i])))
+                self.compute_phase(self.kinematics_signal[-1])
+                self.update_latest_loop(self.kinematics_signal[-1])
 
-                    if self.is_use_baseline:  self.compute_phase_offset()
+        # Update estimator according to active mode
+        match self.active_mode:
+            case "sleeping":
+                self.kinematics_signal.append(np.zeros(2 * self.n_dims))
+                # update_pos_vel_kinem()
+                self.local_phase_signal.append(None)
+                self.global_phase_signal.append(None)
 
-                    # estimate phase for the first loop
-                    for i in range(len(self.latest_pos_loop), len(self.pos_signal) - 1):
-                        curr_kinematics = np.concatenate((self.pos_signal[i], self.vel_signal[i]))
-                        self.compute_phase(curr_kinematics)
-                        self.update_latest_loop(curr_kinematics)
-        else:
-            curr_kinematics = np.zeros(2 * self.n_dims)
+            case "listening":
+                update_pos_vel_kinem()
+                self.local_phase_signal.append(None)
+                self.global_phase_signal.append(None)
 
-        if self.is_first_loop_estimated:
-            self.compute_phase(curr_kinematics)  # TODO it would be better if these final steps could be integrated in the previous logic
-        else:
-            self.phase_signal.append(None)
+            case "estimating":
+                update_pos_vel_kinem()
+                self.compute_phase(self.kinematics_signal[-1])
+                self.update_latest_loop(self.kinematics_signal[-1])
 
-        if self.is_first_loop_estimated:  self.update_latest_loop(curr_kinematics)
-
-        if self.phase_signal[-1] is None:  return None
-        else: return np.mod(self.phase_signal[-1] + self.phase_offset, 2 * np.pi)
+        return self.global_phase_signal[-1]
 
 
     def update_latest_loop(self, curr_kinematics): # updates the vector of the last loop when the phase completes a full cycle.
@@ -126,8 +136,8 @@ class OnlineMultidimPhaseEstimator:
             self.look_ahead_range  = max(1, int(len(self.latest_pos_loop) * self.look_ahead_pcent  / 100))
             self.look_behind_range = max(1, int(len(self.latest_pos_loop) * self.look_behind_pcent / 100))
 
-        if len(self.phase_signal) > 1 and self.phase_signal[-2] is not None:
-            if self.phase_signal[-1] - self.phase_signal[-2] < -self.phase_jump_for_loop_detection:   # a quasiperiodicity window ended  # TODO MC: this check could be done in the caller
+        if len(self.local_phase_signal) > 1 and self.local_phase_signal[-2] is not None:
+            if self.local_phase_signal[-1] - self.local_phase_signal[-2] < -self.phase_jump_for_loop_detection:   # a quasiperiodicity window ended  # TODO MC: this check could be done in the caller
                 self.delimiter_time_instants.append(float(self.local_time_signal[-1] + self.initial_time))
                 length_new_loop = self.idx_curr_time_loop + 1
                 # if the difference in length between new loop and previous loop is smaller than the range set by user
@@ -153,7 +163,6 @@ class OnlineMultidimPhaseEstimator:
 
 
     def compute_phase(self, curr_kinematics):
-        assert self.is_first_loop_estimated, "ERROR"  # TODO FIXME
         len_latest_loop = len(self.latest_pos_loop)
         if self.idx_curr_phase_in_latest_loop - self.look_behind_range < 0:
             #    loop: [part_1 - - - - - - - - part_2]
@@ -178,10 +187,11 @@ class OnlineMultidimPhaseEstimator:
                                                       curr_vel   = curr_kinematics[self.n_dims:])
 
         self.idx_curr_phase_in_latest_loop = idxs_loop_for_search[index_min_distance]
-        self.phase_signal.append( (2 * np.pi * self.idx_curr_phase_in_latest_loop) / len_latest_loop )
-        if len(self.phase_signal) > 1 and self.phase_signal[-2] is not None:
-            if self.phase_signal[-1] - self.phase_signal[-2] > self.phase_jump_for_loop_detection:  # Avoid 0 to 2pi jumps
-                self.phase_signal[-1] = self.phase_signal[-2]
+        self.local_phase_signal.append((2 * np.pi * self.idx_curr_phase_in_latest_loop) / len_latest_loop)
+        if len(self.local_phase_signal) > 1 and self.local_phase_signal[-2] is not None:
+            if self.local_phase_signal[-1] - self.local_phase_signal[-2] > self.phase_jump_for_loop_detection:  # Avoid 0 to 2pi jumps
+                self.local_phase_signal[-1] = self.local_phase_signal[-2]
+        self.global_phase_signal.append(np.mod(self.local_phase_signal[-1] + self.phase_offset, 2 * np.pi))
 
     
     def compute_phase_offset(self) -> None:
@@ -204,7 +214,8 @@ class OnlineMultidimPhaseEstimator:
         scaled_rotated_centered_loop = rotated_centered_loop * scale_factors
 
         curr_pos_ = scaled_rotated_centered_loop[0, :]
-        curr_vel_ = (scaled_rotated_centered_loop[1, :] - scaled_rotated_centered_loop[0, :]) / self.curr_step_time
+        curr_step_time = self.local_time_signal[-1] - self.local_time_signal[-2]
+        curr_vel_ = (scaled_rotated_centered_loop[1, :] - scaled_rotated_centered_loop[0, :]) / curr_step_time
         baseline_vel_loop = np.gradient(self.baseline_pos_loop, np.arange(0, len(self.baseline_pos_loop) * self.time_step_baseline, self.time_step_baseline), axis=0)
         index = compute_idx_min_distance(pos_signal = self.baseline_pos_loop.copy(),
                                          vel_signal = baseline_vel_loop.copy(),
