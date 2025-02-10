@@ -35,12 +35,11 @@ class OnlineMultidimPhaseEstimator:
 
         self.curr_step_time = None
         self.initial_time = None
+        self.active_mode = "sleeping"
         self.max_diff_len_new_loop_pcent   = 30             # difference in length of the new reference (vector length) compared to the old one, expressed as a percentage of the old length, is accepted. # TODO really neded?
         self.is_first_loop_estimated       = False
         self.phase_jump_for_loop_detection = np.pi
         self.phase_offset                  = 0
-        self.curr_phase                    = None  #TODO can make a list?
-        self.prev_phase                    = None
         self.idx_curr_time_loop            = 0    #TODO can remove initialization?
         self.idx_curr_phase_in_latest_loop = 0
 
@@ -108,11 +107,15 @@ class OnlineMultidimPhaseEstimator:
         else:
             curr_kinematics = np.zeros(2 * self.n_dims)
 
-        self.compute_phase(curr_kinematics)   # TODO it would be better if these final steps could be integrated in the previous logic
+        if self.is_first_loop_estimated:
+            self.compute_phase(curr_kinematics)  # TODO it would be better if these final steps could be integrated in the previous logic
+        else:
+            self.phase_signal.append(None)
 
         if self.is_first_loop_estimated:  self.update_latest_loop(curr_kinematics)
 
-        return np.mod(self.curr_phase + self.phase_offset, 2 * np.pi)
+        if self.phase_signal[-1] is None:  return None
+        else: return np.mod(self.phase_signal[-1] + self.phase_offset, 2 * np.pi)
 
 
     def update_latest_loop(self, curr_kinematics): # updates the vector of the last loop when the phase completes a full cycle.
@@ -123,24 +126,25 @@ class OnlineMultidimPhaseEstimator:
             self.look_ahead_range  = max(1, int(len(self.latest_pos_loop) * self.look_ahead_pcent  / 100))
             self.look_behind_range = max(1, int(len(self.latest_pos_loop) * self.look_behind_pcent / 100))
 
-        if self.curr_phase - self.prev_phase < -self.phase_jump_for_loop_detection:   # a quasiperiodicity window ended  # TODO MC: this check could be done in the caller
-            self.delimiter_time_instants.append(float(self.local_time_signal[-1] + self.initial_time))
-            length_new_loop = self.idx_curr_time_loop + 1
-            # if the difference in length between new loop and previous loop is smaller than the range set by user
-            if abs(length_new_loop - len(self.latest_pos_loop)) < len(self.latest_pos_loop)*self.max_diff_len_new_loop_pcent/100:
-                update_latest_loop_and_ranges()
+        if len(self.phase_signal) > 1 and self.phase_signal[-2] is not None:
+            if self.phase_signal[-1] - self.phase_signal[-2] < -self.phase_jump_for_loop_detection:   # a quasiperiodicity window ended  # TODO MC: this check could be done in the caller
+                self.delimiter_time_instants.append(float(self.local_time_signal[-1] + self.initial_time))
+                length_new_loop = self.idx_curr_time_loop + 1
+                # if the difference in length between new loop and previous loop is smaller than the range set by user
+                if abs(length_new_loop - len(self.latest_pos_loop)) < len(self.latest_pos_loop)*self.max_diff_len_new_loop_pcent/100:
+                    update_latest_loop_and_ranges()
 
-            # if the difference in length between new loop and previous discarded loop is smaller than the range set by user   # TODO MC: I don't get the rationale behind this logic
-            elif abs(length_new_loop - self.len_last_period_discarded) < self.len_last_period_discarded*self.max_diff_len_new_loop_pcent/100:
-                update_latest_loop_and_ranges()
-                self.len_last_period_discarded = 0
+                # if the difference in length between new loop and previous discarded loop is smaller than the range set by user   # TODO MC: I don't get the rationale behind this logic
+                elif abs(length_new_loop - self.len_last_period_discarded) < self.len_last_period_discarded*self.max_diff_len_new_loop_pcent/100:
+                    update_latest_loop_and_ranges()
+                    self.len_last_period_discarded = 0
 
-            else:
-                self.len_last_period_discarded = self.idx_curr_time_loop + 1
+                else:
+                    self.len_last_period_discarded = self.idx_curr_time_loop + 1
 
-            # reinitialize new_loop
-            self.new_loop = np.zeros((self.max_length_loop, 2*self.n_dims))
-            self.idx_curr_time_loop = 0
+                # reinitialize new_loop
+                self.new_loop = np.zeros((self.max_length_loop, 2*self.n_dims))
+                self.idx_curr_time_loop = 0
 
         # append current kinematics to new loop
         if self.idx_curr_time_loop < self.max_length_loop:
@@ -149,39 +153,35 @@ class OnlineMultidimPhaseEstimator:
 
 
     def compute_phase(self, curr_kinematics):
-        if self.is_first_loop_estimated:
-            len_latest_loop = len(self.latest_pos_loop)
-            if self.idx_curr_phase_in_latest_loop - self.look_behind_range < 0:
-                #    loop: [part_1 - - - - - - - - part_2]
-                idxs_part_1 = np.arange(0, self.idx_curr_phase_in_latest_loop + self.look_ahead_range) 
-                idxs_part_2 = np.arange(len_latest_loop - self.look_behind_range + self.idx_curr_phase_in_latest_loop, len_latest_loop) 
-                idxs_loop_for_search = np.concatenate((idxs_part_1, idxs_part_2))
-                loop_for_search = self.latest_pos_loop[idxs_loop_for_search]
-            elif self.idx_curr_phase_in_latest_loop + self.look_ahead_range > len_latest_loop:
-                #    loop: [part_2 - - - - - - - - part_1]
-                idxs_part_1 = np.arange(self.idx_curr_phase_in_latest_loop - self.look_behind_range, len_latest_loop)    
-                idxs_part_2 = np.arange(0, self.idx_curr_phase_in_latest_loop + self.look_ahead_range - len_latest_loop) 
-                idxs_loop_for_search = np.concatenate((idxs_part_1, idxs_part_2))   
-                loop_for_search = self.latest_pos_loop[idxs_loop_for_search]
-            else:
-                #   loop: [- - - - - - single part - - - - -]
-                idxs_loop_for_search = np.arange(self.idx_curr_phase_in_latest_loop - self.look_behind_range, self.idx_curr_phase_in_latest_loop + self.look_ahead_range)
-                loop_for_search = self.latest_pos_loop[idxs_loop_for_search]
-
-            index_min_distance = compute_idx_min_distance(pos_signal = loop_for_search[:, 0:self.n_dims].copy(),
-                                                          vel_signal = loop_for_search[:, self.n_dims:].copy(),
-                                                          curr_pos   = curr_kinematics[0:self.n_dims],
-                                                          curr_vel   = curr_kinematics[self.n_dims:])
-
-            self.idx_curr_phase_in_latest_loop = idxs_loop_for_search[index_min_distance]
-            self.prev_phase = self.curr_phase
-            self.curr_phase = (2 * np.pi * self.idx_curr_phase_in_latest_loop) / len_latest_loop
-            if self.curr_phase - self.prev_phase > self.phase_jump_for_loop_detection:  # Avoid 0 to 2pi jumps
-                 self.curr_phase = self.prev_phase
-
+        assert self.is_first_loop_estimated, "ERROR"  # TODO FIXME
+        len_latest_loop = len(self.latest_pos_loop)
+        if self.idx_curr_phase_in_latest_loop - self.look_behind_range < 0:
+            #    loop: [part_1 - - - - - - - - part_2]
+            idxs_part_1 = np.arange(0, self.idx_curr_phase_in_latest_loop + self.look_ahead_range)
+            idxs_part_2 = np.arange(len_latest_loop - self.look_behind_range + self.idx_curr_phase_in_latest_loop, len_latest_loop)
+            idxs_loop_for_search = np.concatenate((idxs_part_1, idxs_part_2))
+            loop_for_search = self.latest_pos_loop[idxs_loop_for_search]
+        elif self.idx_curr_phase_in_latest_loop + self.look_ahead_range > len_latest_loop:
+            #    loop: [part_2 - - - - - - - - part_1]
+            idxs_part_1 = np.arange(self.idx_curr_phase_in_latest_loop - self.look_behind_range, len_latest_loop)
+            idxs_part_2 = np.arange(0, self.idx_curr_phase_in_latest_loop + self.look_ahead_range - len_latest_loop)
+            idxs_loop_for_search = np.concatenate((idxs_part_1, idxs_part_2))
+            loop_for_search = self.latest_pos_loop[idxs_loop_for_search]
         else:
-            self.prev_phase = 0   # TODO: maybe it's better to return None when we cannot estimate phase. Also this function could just have an assert, and the logic is managed in the caller
-            self.curr_phase = 0
+            #   loop: [- - - - - - single part - - - - -]
+            idxs_loop_for_search = np.arange(self.idx_curr_phase_in_latest_loop - self.look_behind_range, self.idx_curr_phase_in_latest_loop + self.look_ahead_range)
+            loop_for_search = self.latest_pos_loop[idxs_loop_for_search]
+
+        index_min_distance = compute_idx_min_distance(pos_signal = loop_for_search[:, 0:self.n_dims].copy(),
+                                                      vel_signal = loop_for_search[:, self.n_dims:].copy(),
+                                                      curr_pos   = curr_kinematics[0:self.n_dims],
+                                                      curr_vel   = curr_kinematics[self.n_dims:])
+
+        self.idx_curr_phase_in_latest_loop = idxs_loop_for_search[index_min_distance]
+        self.phase_signal.append( (2 * np.pi * self.idx_curr_phase_in_latest_loop) / len_latest_loop )
+        if len(self.phase_signal) > 1 and self.phase_signal[-2] is not None:
+            if self.phase_signal[-1] - self.phase_signal[-2] > self.phase_jump_for_loop_detection:  # Avoid 0 to 2pi jumps
+                self.phase_signal[-1] = self.phase_signal[-2]
 
     
     def compute_phase_offset(self) -> None:
