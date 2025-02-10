@@ -13,7 +13,7 @@ class OnlineMultidimPhaseEstimator:
                  discarded_time                 = 0,
                  min_duration_first_quasiperiod = 1,
                  look_behind_pcent              = 0,
-                 look_ahead_pcent               = 25,
+                 look_ahead_pcent               = 10,
                  is_use_baseline                = False,
                  baseline_pos_loop              = None,
                  time_step_baseline             = 0.01,
@@ -21,6 +21,7 @@ class OnlineMultidimPhaseEstimator:
                  ref_frame_point_2              = None,
                  ref_frame_point_3              = None):
 
+        self.is_first_loop_estimated = False
         assert look_ahead_pcent + look_behind_pcent <= 100, "look_ahead_pcent + look_behind_pcent must not exceed 100"
 
         # Initialization from arguments
@@ -33,33 +34,8 @@ class OnlineMultidimPhaseEstimator:
         self.min_duration_quasiperiod  = min_duration_first_quasiperiod # [s]
         self.time_step_baseline        = time_step_baseline
 
-        self.initial_time = None
-        self.active_mode = "sleeping"
-        self.max_diff_len_new_loop_pcent   = 30             # difference in length of the new reference (vector length) compared to the old one, expressed as a percentage of the old length, is accepted. # TODO really neded?
-        self.is_first_loop_estimated       = False
-        self.phase_jump_for_loop_detection = np.pi
-        self.phase_offset                  = 0
-        self.idx_curr_time_loop            = 0    #TODO can remove initialization?
-        self.idx_curr_phase_in_latest_loop = 0
-
-        self.max_length_loop         = 10000
-        self.latest_pos_loop         = None
-        self.new_loop                = np.zeros((self.max_length_loop, 2*self.n_dims))   # TODO make this something which is appended each time?
-
-        self.pos_signal              = []
-        self.vel_signal              = []
-        self.kinematics_signal       = []
-        self.local_time_signal       = []
-        self.delimiter_time_instants = []
-        self.local_phase_signal      = []  # local:  without offset
-        self.global_phase_signal     = []  # global: with offset
-
-        self.len_last_period_discarded = 0   # TODO move this?
-        self.look_ahead_range          = 0
-        self.look_behind_range         = 0
-
         if is_use_baseline:
-            assert n_dims_estimand_pos == 3, "Tethered mode can be used only with n_dim = 3"
+            assert n_dims_estimand_pos == 3,      "Tethered mode can be used only with n_dim = 3"
             assert baseline_pos_loop is not None, "Tethered mode was required but baseline_pos_loop was not provided"
             assert ref_frame_point_1 is not None, "Tethered mode was required but ref_frame_point_1 was not provided"
             assert ref_frame_point_2 is not None, "Tethered mode was required but ref_frame_point_2 was not provided"
@@ -70,62 +46,92 @@ class OnlineMultidimPhaseEstimator:
             self.ref_frame_point_2 = ref_frame_point_2.copy()
             self.ref_frame_point_3 = ref_frame_point_3.copy()
 
+        # Attributes not tunable by caller
+        self.phase_jump_for_loop_detection = np.pi
+        self.max_diff_len_new_loop_pcent   = 30             # difference in length of the new reference (vector length) compared to the old one, expressed as a percentage of the old length, is accepted. # TODO really neded?
+        self.max_length_loop         = 10000
+
+        # Initial values
+        self.active_mode             = "sleeping"
+        self.phase_offset            = 0
+
+        self.pos_signal              = []
+        self.vel_signal              = []
+        self.kinematics_signal       = []
+        self.local_time_signal       = []
+        self.delimiter_time_instants = []
+        self.local_phase_signal      = []  # local:  without offset
+        self.global_phase_signal     = []  # global: with offset
+
+        self.idx_curr_time_loop            = 0
+        self.idx_curr_phase_in_latest_loop = 0
+        self.latest_pos_loop         = None
+        self.new_loop                = np.zeros((self.max_length_loop, 2*self.n_dims))   # TODO make this something which is appended each time?
+        self.len_last_period_discarded = 0   # TODO move this?
+
+
+    def get_kinematics(self, idx:int) -> np.ndarray:
+        return np.concatenate((self.pos_signal[idx], self.vel_signal[idx]))
+
 
     def update_estimator(self, curr_pos, curr_time) -> float:
-        def update_pos_vel_kinem() -> None:
+
+        def update_pos_vel() -> None:
             self.pos_signal.append(curr_pos)
             if len(self.pos_signal) >= 2:
                 curr_step_time = self.local_time_signal[-1] - self.local_time_signal[-2]
                 self.vel_signal.append((self.pos_signal[-1] - self.pos_signal[-2]) / curr_step_time)
             else:                          self.vel_signal.append(np.zeros(self.n_dims))
-            self.kinematics_signal.append(np.concatenate((self.pos_signal[-1], self.vel_signal[-1])))
 
         if not self.local_time_signal:  self.initial_time = curr_time  # initialize initial_time
         self.local_time_signal.append(curr_time - self.initial_time)
 
         # Update active mode
-        if self.active_mode == "sleeping" and self.local_time_signal[-1] > self.discarded_time:
+        if self.active_mode == "sleeping" and self.local_time_signal[-1] >= self.discarded_time:
             self.active_mode = "listening"
         if self.active_mode == "listening" and self.local_time_signal[-1] > self.discarded_time + self.listening_time:
             self.active_mode = "estimating"
-            # compute first loop (run only once)
-            self.latest_pos_loop = compute_loop_with_autocorrelation(
-                pos_signal=self.pos_signal,
-                vel_signal=self.vel_signal,
-                local_time_vec=self.local_time_signal,
-                min_duration_quasiperiod=self.min_duration_quasiperiod)
-
-            self.look_ahead_range = int(
-                len(self.latest_pos_loop) * self.look_ahead_pcent / 100)  # range_post is the number of points after the last nearest point on which estimate the new phase
-            self.look_behind_range = int(len(self.latest_pos_loop) * self.look_behind_pcent / 100)
-
-            if self.is_use_baseline:  self.compute_phase_offset()
-
-            # estimate phase for the first loop
-            for i in range(len(self.latest_pos_loop), len(self.pos_signal) - 1):
-                self.kinematics_signal.append(np.concatenate((self.pos_signal[i], self.vel_signal[i])))
-                self.compute_phase(self.kinematics_signal[-1])
-                self.update_latest_loop(self.kinematics_signal[-1])
-
+ 
         # Update estimator according to active mode
         match self.active_mode:
             case "sleeping":
-                self.kinematics_signal.append(np.zeros(2 * self.n_dims))
-                # update_pos_vel_kinem()
-                self.local_phase_signal.append(None)
-                self.global_phase_signal.append(None)
+                return None
 
             case "listening":
-                update_pos_vel_kinem()
-                self.local_phase_signal.append(None)
-                self.global_phase_signal.append(None)
+                update_pos_vel()
+                return None
 
             case "estimating":
-                update_pos_vel_kinem()
-                self.compute_phase(self.kinematics_signal[-1])
-                self.update_latest_loop(self.kinematics_signal[-1])
+                update_pos_vel()
 
-        return self.global_phase_signal[-1]
+                if not self.is_first_loop_estimated:
+                    self.latest_pos_loop = compute_loop_with_autocorrelation(
+                        pos_signal=self.pos_signal,
+                        vel_signal=self.vel_signal,
+                        local_time_vec=self.local_time_signal,
+                        min_duration_quasiperiod=self.min_duration_quasiperiod)
+                    self.is_first_loop_estimated = True
+                    
+                    self.look_ahead_range  = int(len(self.latest_pos_loop) * self.look_ahead_pcent / 100)  # range_post is the number of points after the last nearest point on which estimate the new phase
+                    self.look_behind_range = int(len(self.latest_pos_loop) * self.look_behind_pcent / 100)
+    
+                    if self.is_use_baseline:  self.compute_phase_offset()
+    
+                    # phases in first loop
+                    local_phases_first_loop = np.linspace(0, 2 * np.pi, len(self.latest_pos_loop))
+                    global_phases_first_loop = np.mod(local_phases_first_loop + self.phase_offset, 2 * np.pi)
+                    self.local_phase_signal = self.local_phase_signal + local_phases_first_loop.tolist()
+                    self.global_phase_signal = self.global_phase_signal + (
+                                global_phases_first_loop + self.phase_offset).tolist()
+    
+                    # phase between first loop and current time
+                    for i in range(len(self.latest_pos_loop), len(self.pos_signal) - 1):
+                        self.compute_phase(self.get_kinematics(i))
+                        self.update_latest_loop(self.get_kinematics(i))
+
+                self.compute_phase(self.get_kinematics(-1))
+                self.update_latest_loop(self.get_kinematics(-1))
+                return self.global_phase_signal[-1]
 
 
     def update_latest_loop(self, curr_kinematics): # updates the vector of the last loop when the phase completes a full cycle.
