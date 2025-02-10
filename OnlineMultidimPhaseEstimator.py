@@ -95,8 +95,8 @@ class OnlineMultidimPhaseEstimator:
                         min_duration_quasiperiod = self.min_duration_quasiperiod)
 
                     self.is_first_loop_estimated = True
-                    self.look_ahead_range  = max(1, int(len(self.latest_pos_loop) * self.look_ahead_pcent  / 100))   # range_post is the number of points after the last nearest point on which estimate the new phase
-                    self.look_behind_range = max(1, int(len(self.latest_pos_loop) * self.look_behind_pcent / 100))   # TODO why these have minimum value 1?
+                    self.look_ahead_range  = int(len(self.latest_pos_loop) * self.look_ahead_pcent  / 100)   # range_post is the number of points after the last nearest point on which estimate the new phase
+                    self.look_behind_range = int(len(self.latest_pos_loop) * self.look_behind_pcent / 100)
 
                     if self.is_use_baseline:  self.compute_phase_offset()
 
