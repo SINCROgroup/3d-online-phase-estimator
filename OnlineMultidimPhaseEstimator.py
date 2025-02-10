@@ -148,6 +148,7 @@ class OnlineMultidimPhaseEstimator:
                 self.latest_pos_loop = np.vstack(self.new_loop)
                 self.update_look_ranges()
                 self.new_loop = []         # reinitialize new_loop
+                self.idx_curr_phase_in_latest_loop = 0
 
 
     def compute_phase(self, curr_kinematics):
@@ -173,9 +174,6 @@ class OnlineMultidimPhaseEstimator:
 
         self.idx_curr_phase_in_latest_loop = idxs_loop_for_search[index_min_distance]
         self.local_phase_signal.append((2 * np.pi * self.idx_curr_phase_in_latest_loop) / len_latest_loop)
-        if len(self.local_phase_signal) > 1 and self.local_phase_signal[-2] is not None:
-            if self.local_phase_signal[-1] - self.local_phase_signal[-2] > self.phase_jump_for_loop_detection:  # Avoid 0 to 2pi jumps
-                self.local_phase_signal[-1] = self.local_phase_signal[-2]
         self.global_phase_signal.append(np.mod(self.local_phase_signal[-1] + self.phase_offset, 2 * np.pi))
 
     
@@ -235,10 +233,9 @@ def compute_loop_with_autocorrelation(pos_signal, vel_signal, local_time_vec, mi
 
     peaks, _ = find_peaks(autocorr_vec_tot)
     peaks_values = autocorr_vec_tot[peaks[np.where(peaks > idx_min_length)]]
-    lower_bound_acceptable_peaks_values = max(peaks_values) - (
-                max(peaks_values) * threshold_acceptable_peaks_wrt_maximum_pcent / 100)
+    assert max(peaks_values) > 0, "No valid first loop was found, try increasing the listening time."
+    lower_bound_acceptable_peaks_values = max(peaks_values) - (max(peaks_values) * threshold_acceptable_peaks_wrt_maximum_pcent / 100)
     idxs_possible_period = np.where(peaks_values > lower_bound_acceptable_peaks_values)[0]  # indexing necessary because np.where returns a tuple containing an array
-    assert len(idxs_possible_period) > 0, "No valid first loop was found, try increasing the listening time."
     idx_start_loop = 0
     idx_end_loop = peaks[idxs_possible_period][0]
 
