@@ -26,8 +26,8 @@ class OnlineMultidimPhaseEstimator:
         self.discarded_time            = discarded_time       # [s] discarded at the beginning before estimation
         self.listening_time            = listening_time       # [s] waits this time before estimating first loop must contain 2 quasiperiods
         self.look_ahead_pcent          = look_ahead_pcent     # % of last completed loop before last nearest point on which estimate the new phase
-        self.look_behind_pcent         = look_behind_pcent    # % of last completed loop after  last nearest point on which estimate the new phase
-        # TODO assert somma <= 100
+        self.look_behind_pcent         = look_behind_pcent    # % of last completed loop after last nearest point on which estimate the new phase
+        assert look_ahead_pcent + look_behind_pcent <= 100, "look_ahead_pcent + look_behind_pcent must not exceed 100"
         self.is_use_baseline           = is_use_baseline
         self.min_duration_quasiperiod  = min_duration_first_quasiperiod # [s]
         self.time_step_baseline        = time_step_baseline
@@ -156,20 +156,16 @@ class OnlineMultidimPhaseEstimator:
                 idxs_part_2 = np.arange(len_latest_loop - self.look_behind_range + self.idx_curr_phase_in_latest_loop, len_latest_loop) 
                 idxs_loop_for_search = np.concatenate((idxs_part_1, idxs_part_2))
                 loop_for_search = self.latest_pos_loop[idxs_loop_for_search]
-  
             elif self.idx_curr_phase_in_latest_loop + self.look_ahead_range > len_latest_loop:
                 #    loop: [part_2 - - - - - - - - part_1]
                 idxs_part_1 = np.arange(self.idx_curr_phase_in_latest_loop - self.look_behind_range, len_latest_loop)    
                 idxs_part_2 = np.arange(0, self.idx_curr_phase_in_latest_loop + self.look_ahead_range - len_latest_loop) 
                 idxs_loop_for_search = np.concatenate((idxs_part_1, idxs_part_2))   
                 loop_for_search = [idxs_loop_for_search]
-
-
             else:
                 #   loop: [- - - - - - single part - - - - -]
                 idxs_loop_for_search = np.arange(self.idx_curr_phase_in_latest_loop - self.look_behind_range, self.idx_curr_phase_in_latest_loop + self.look_ahead_range)
                 loop_for_search = [idxs_loop_for_search]
-                
 
             index_min_distance = compute_idx_min_distance(pos_signal = loop_for_search[:, 0:self.n_dims].copy(),
                                                           vel_signal = loop_for_search[:, self.n_dims:].copy(),
