@@ -13,15 +13,15 @@ from OnlineMultidimPhaseEstimator import OnlineMultidimPhaseEstimator
 discarded_time                 = 1      # [s] all time between start and discarded_time (excluded) is discarded
 min_duration_first_quasiperiod = 0      # [s]
 listening_time                 = 10     # [s] waits this time before estimating first loop must contain 2 quasiperiods
-look_behind_pcent              = 0      # % of last completed loop before last nearest point on which estimate the new phase
-look_ahead_pcent               = 10     # % of last completed loop after  last nearest point on which estimate the new phase
+look_behind_pcent              = 10      # % of last completed loop before last nearest point on which estimate the new phase
+look_ahead_pcent               = 15     # % of last completed loop after  last nearest point on which estimate the new phase
 # is_use_baseline                = False  # True: tethered mode; False: untethered mode
 
-file_path_estimand  = r"data\san_giovanni_2024-10-10\spiral_mc_2.csv"
+file_path_estimand  = r"data\san_giovanni_2024-10-10\spiral_fdl_3.csv"
 rows_to_skip_estimand = [0, 1, 2] + list(range(4, 40))
 col_names_pos_estimand = ['TX.3', 'TY.3', 'TZ.3']
 time_step           = 0.01  # [s]
-is_use_baseline = True
+is_use_baseline = False
 time_step_baseline  = 0.01
 file_path_baseline  = r"data\san_giovanni_2024-10-10\spiral_ref.csv"
 col_names_pos_baseline = ['x', 'y', 'z']
