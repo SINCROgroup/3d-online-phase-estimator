@@ -62,7 +62,7 @@ class OnlineMultidimPhaseEstimator:
         self.local_phase_signal      = []  # local:  without offset
         self.global_phase_signal     = []  # global: with offset
 
-        self.idx_curr_time_loop            = 0
+        self.curr_idx_in_new_loop            = 0
         self.idx_curr_phase_in_latest_loop = 0
         self.latest_pos_loop               = None
         self.new_loop                      = np.zeros((self.max_length_loop, 2*self.n_dims))   # TODO make this something which is appended each time?
@@ -126,49 +126,50 @@ class OnlineMultidimPhaseEstimator:
                     global_phases_first_loop = np.mod(local_phases_first_loop + self.phase_offset, 2 * np.pi)
                     self.local_phase_signal  = self.local_phase_signal + local_phases_first_loop.tolist()
                     self.global_phase_signal = self.global_phase_signal + (global_phases_first_loop + self.phase_offset).tolist()
-    
+
                     # Estimate phases between first loop and current time
-                    for i in range(len(self.latest_pos_loop), len(self.pos_signal) - 1):
+                    self.compute_phase(self.get_kinematics(len(self.latest_pos_loop)))       # first instant
+                    # in first instant of second loop you don't check whether to update the loop
+                    self.append_kinem_to_new_loop(self.get_kinematics(len(self.latest_pos_loop)))
+                    for i in range(len(self.latest_pos_loop)+1, len(self.pos_signal) - 1):   # remaining instants
                         self.compute_phase(self.get_kinematics(i))
-                        self.update_latest_loop(self.get_kinematics(i))
+                        self.update_latest_loop()
+                        self.append_kinem_to_new_loop(self.get_kinematics(i))
 
                 # Estimate phase at current time
                 self.compute_phase(self.get_kinematics(-1))
-                self.update_latest_loop(self.get_kinematics(-1))
+                self.update_latest_loop()
+                self.append_kinem_to_new_loop(self.get_kinematics(-1))
                 return self.global_phase_signal[-1]
 
 
-    def update_latest_loop(self, curr_kinematics): # updates the vector of the last loop when the phase completes a full cycle.
-        """checks whether it is necessary to update the latest loop, and, if so, does it"""
-
+    def update_latest_loop(self): # updates the vector of the last loop when the phase completes a full cycle.
+        # Check whether it is necessary to update the latest loop, and, if so, does it
         if len(self.local_phase_signal) > 1 and self.local_phase_signal[-2] is not None:
             if self.local_phase_signal[-1] - self.local_phase_signal[-2] < - self.phase_jump_for_loop_detection:   # a quasiperiodicity window ended  # TODO MC: this check could be done in the caller
                 self.delimiter_time_instants.append(float(self.local_time_signal[-1] + self.initial_time))
-                length_new_loop = self.idx_curr_time_loop + 1
+                length_new_loop = self.curr_idx_in_new_loop + 1
                 # if the difference in length between new loop and previous loop is smaller than the range set by user
                 if abs(length_new_loop - len(self.latest_pos_loop)) < len(self.latest_pos_loop)*self.max_diff_len_new_loop_pcent/100:
-                    self.latest_pos_loop = self.new_loop[0:self.idx_curr_time_loop, :]
+                    self.latest_pos_loop = self.new_loop[0:self.curr_idx_in_new_loop, :]
                     self.update_look_ranges()
-
                 # if the difference in length between new loop and previous discarded loop is smaller than the range set by user   # TODO MC: I don't get the rationale behind this logic
                 elif abs(length_new_loop - self.len_last_period_discarded) < self.len_last_period_discarded*self.max_diff_len_new_loop_pcent/100:
-                    self.latest_pos_loop = self.new_loop[0:self.idx_curr_time_loop, :]
+                    self.latest_pos_loop = self.new_loop[0:self.curr_idx_in_new_loop, :]
                     self.update_look_ranges()
                     self.len_last_period_discarded = 0
-
                 else:
-                    self.len_last_period_discarded = self.idx_curr_time_loop + 1
+                    self.len_last_period_discarded = self.curr_idx_in_new_loop + 1
 
-                # reinitialize new_loop
+                # Reinitialize new_loop
                 self.new_loop = np.zeros((self.max_length_loop, 2*self.n_dims))
-                self.idx_curr_time_loop = 0
+                self.curr_idx_in_new_loop = 0
 
-        # append current kinematics to new loop
+    def append_kinem_to_new_loop(self, curr_kinematics):
         try:
-            self.new_loop[self.idx_curr_time_loop, :] = curr_kinematics
-            self.idx_curr_time_loop += 1
-        except IndexError:
-            raise IndexError("max_length_loop is too small.")
+            self.new_loop[self.curr_idx_in_new_loop, :] = curr_kinematics
+            self.curr_idx_in_new_loop += 1
+        except IndexError:  raise IndexError("max_length_loop is too small.")
 
 
     def compute_phase(self, curr_kinematics):
