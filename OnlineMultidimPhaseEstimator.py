@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 from scipy.signal import detrend, find_peaks
 
@@ -14,6 +16,7 @@ class OnlineMultidimPhaseEstimator:
                  min_duration_first_quasiperiod = 1,
                  look_behind_pcent              = 0,
                  look_ahead_pcent               = 10,
+                 time_constant_lowpass_filter   = None,
                  is_use_baseline                = False,
                  baseline_pos_loop              = None,
                  time_step_baseline             = 0.01,
@@ -25,14 +28,15 @@ class OnlineMultidimPhaseEstimator:
         assert look_ahead_pcent + look_behind_pcent <= 100, "look_ahead_pcent + look_behind_pcent must not exceed 100"
 
         # Initialization from arguments
-        self.n_dims                    = n_dims_estimand_pos
-        self.discarded_time            = discarded_time       # [s] discarded at the beginning before estimation
-        self.listening_time            = listening_time       # [s] waits this time before estimating first loop must contain 2 quasiperiods
-        self.look_ahead_pcent          = look_ahead_pcent     # % of last completed loop before last nearest point on which estimate the new phase
-        self.look_behind_pcent         = look_behind_pcent    # % of last completed loop after last nearest point on which estimate the new phase
-        self.is_use_baseline           = is_use_baseline
-        self.min_duration_quasiperiod  = min_duration_first_quasiperiod # [s]
-        self.time_step_baseline        = time_step_baseline
+        self.n_dims                       = n_dims_estimand_pos
+        self.discarded_time               = discarded_time       # [s] discarded at the beginning before estimation
+        self.listening_time               = listening_time       # [s] waits this time before estimating first loop must contain 2 quasiperiods
+        self.look_ahead_pcent             = look_ahead_pcent     # % of last completed loop before last nearest point on which estimate the new phase
+        self.look_behind_pcent            = look_behind_pcent    # % of last completed loop after last nearest point on which estimate the new phase
+        self.time_constant_lowpass_filter = time_constant_lowpass_filter
+        self.is_use_baseline              = is_use_baseline
+        self.min_duration_quasiperiod     = min_duration_first_quasiperiod # [s]
+        self.time_step_baseline           = time_step_baseline
 
         if is_use_baseline:
             assert n_dims_estimand_pos == 3,      "Tethered mode can be used only with n_dim = 3"
@@ -166,14 +170,16 @@ class OnlineMultidimPhaseEstimator:
             idxs_loop_for_search = np.concatenate((idxs_part_1, idxs_part_2))
             loop_for_search = self.latest_pos_loop[idxs_loop_for_search]
 
+        idx_min_distance = compute_idx_min_distance(pos_signal = loop_for_search[:, 0:self.n_dims].copy(),
+                                                    vel_signal = loop_for_search[:, self.n_dims:].copy(),
+                                                    curr_pos   = curr_kinematics[0:self.n_dims],
+                                                    curr_vel   = curr_kinematics[self.n_dims:])
 
-        index_min_distance = compute_idx_min_distance(pos_signal = loop_for_search[:, 0:self.n_dims].copy(),
-                                                      vel_signal = loop_for_search[:, self.n_dims:].copy(),
-                                                      curr_pos   = curr_kinematics[0:self.n_dims],
-                                                      curr_vel   = curr_kinematics[self.n_dims:])
-
-        self.idx_curr_phase_in_latest_loop = idxs_loop_for_search[index_min_distance]
+        self.idx_curr_phase_in_latest_loop = idxs_loop_for_search[idx_min_distance]
         self.local_phase_signal.append((2 * np.pi * self.idx_curr_phase_in_latest_loop) / len_latest_loop)
+        if not self.time_constant_lowpass_filter in {None, 0, -1}:
+            curr_step_time = self.local_time_signal[-1] - self.local_time_signal[-2]
+            self.local_phase_signal[-1] = lowpass_filter_phase(self.local_phase_signal[-2], self.local_phase_signal[-1], curr_step_time, self.time_constant_lowpass_filter)
         self.global_phase_signal.append(np.mod(self.local_phase_signal[-1] + self.phase_offset, 2 * np.pi))
 
     
@@ -270,3 +276,14 @@ def compute_idx_min_distance(pos_signal, vel_signal, curr_pos, curr_vel) -> int:
     distances_vel = distances_vel / max(distances_vel, default=1)
     return np.argmin(distances_pos + distances_vel)
 
+
+def lowpass_filter_phase(prev_phase:float, input_phase:float, time_step:float=0.01, time_constant:float=0.2) -> float:
+    if time_constant < time_step:
+        warnings.warn("time_constant must be >= time_step", UserWarning)
+        time_constant = time_step
+    if prev_phase - input_phase > np.pi:
+        return input_phase  # no filtering if a jump is detected
+    else:
+        gain = time_step / time_constant
+        filtered_phase = (1 - gain) * prev_phase + gain * input_phase
+        return np.mod(filtered_phase, 2 * np.pi)  # wrap into [0, 2π)
