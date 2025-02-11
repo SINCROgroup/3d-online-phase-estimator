@@ -268,10 +268,8 @@ def compute_autocorr_vec(signal: np.ndarray) -> np.ndarray:
 
 
 def compute_idx_min_distance(pos_signal, vel_signal, curr_pos, curr_vel) -> int:
-    pos_signal_copied = pos_signal.copy()
-    vel_signal_copied = vel_signal.copy()
-    distances_pos = np.sqrt(np.sum((pos_signal_copied - curr_pos) ** 2, axis=1))
-    distances_vel = np.sqrt(np.sum((vel_signal_copied - curr_vel) ** 2, axis=1))
+    distances_pos = np.sqrt(np.sum((pos_signal - curr_pos) ** 2, axis=1))
+    distances_vel = np.sqrt(np.sum((vel_signal - curr_vel) ** 2, axis=1))
     distances_pos = distances_pos / max(distances_pos, default=1)  # avoids dividing by zero
     distances_vel = distances_vel / max(distances_vel, default=1)
     return np.argmin(distances_pos + distances_vel)
