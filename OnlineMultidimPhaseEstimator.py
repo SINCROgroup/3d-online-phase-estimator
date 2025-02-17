@@ -1,7 +1,8 @@
 import warnings
-
 import numpy as np
 from scipy.signal import detrend, find_peaks
+
+from LowPassFilters import LowPassFilterPhase
 
 
 ##################################################
@@ -131,16 +132,20 @@ class OnlineMultidimPhaseEstimator:
                     # Estimate phases between first loop and current time
                     idx_first_instant_of_second_loop = len(self.latest_pos_loop)
                     idx_prev_instant = len(self.pos_signal) - 2
-                    self.compute_phase(self.get_kinematics(idx_first_instant_of_second_loop))
-                    # in first instant of second loop you don't check whether to update the loop
-                    self.new_loop.append(self.get_kinematics(idx_first_instant_of_second_loop))
-                    for idx_scanning in range(idx_first_instant_of_second_loop+1, idx_prev_instant+1):   # recall: range excludes end point
-                        self.compute_phase(self.get_kinematics(idx_scanning))
-                        self.possibly_update_latest_loop(self.local_time_signal[idx_scanning + self.idx_time_start_listening] + self.initial_time)
+                    self.lowpass_filter_phase = LowPassFilterPhase(init_state=self.local_phase_signal[-1],
+                                                                 time_step=self.local_time_signal[idx_first_instant_of_second_loop] - self.local_time_signal[idx_first_instant_of_second_loop-1],
+                                                                 time_const=self.time_constant_lowpass_filter,
+                                                                 wrap_interv="0_to_2pi")
+                    for idx_scanning in range(idx_first_instant_of_second_loop, idx_prev_instant+1):   # recall: range excludes end point
+                        curr_time_step = self.local_time_signal[idx_scanning] - self.local_time_signal[idx_scanning-1]
+                        self.compute_phase(self.get_kinematics(idx_scanning), curr_time_step)
+                        if idx_scanning > idx_first_instant_of_second_loop:  # at first instant of second loop don't check, because new loop is already loaded and besides new_loop is empty
+                            self.possibly_update_latest_loop(self.local_time_signal[idx_scanning + self.idx_time_start_listening] + self.initial_time)
                         self.new_loop.append(self.get_kinematics(idx_scanning))
 
                 # Estimate phase at current time
-                self.compute_phase(self.get_kinematics(-1))
+                curr_time_step = self.local_time_signal[-1] - self.local_time_signal[-2]
+                self.compute_phase(self.get_kinematics(-1), curr_time_step)
                 self.possibly_update_latest_loop(curr_time)
                 self.new_loop.append(self.get_kinematics(-1))
                 return self.global_phase_signal[-1]
@@ -155,7 +160,7 @@ class OnlineMultidimPhaseEstimator:
                 self.idx_curr_phase_in_latest_loop = 0
 
 
-    def compute_phase(self, curr_kinematics):
+    def compute_phase(self, curr_kinematics, curr_time_step):
         len_latest_loop = len(self.latest_pos_loop)
         if self.idx_curr_phase_in_latest_loop + self.look_ahead_range <= len_latest_loop:
             #   loop: [- - - - - - single part - - - - -]
@@ -178,8 +183,8 @@ class OnlineMultidimPhaseEstimator:
         self.idx_curr_phase_in_latest_loop = idxs_loop_for_search[idx_min_distance]
         self.local_phase_signal.append((2 * np.pi * self.idx_curr_phase_in_latest_loop) / len_latest_loop)
         if not self.time_constant_lowpass_filter in {None, 0, -1}:
-            curr_step_time = self.local_time_signal[-1] - self.local_time_signal[-2]
-            self.local_phase_signal[-1] = lowpass_filter_phase(self.local_phase_signal[-2], self.local_phase_signal[-1], curr_step_time, self.time_constant_lowpass_filter)
+            self.lowpass_filter_phase.change_time_step(curr_time_step)
+            self.local_phase_signal[-1] = self.lowpass_filter_phase.update_state(self.local_phase_signal[-1])
         self.global_phase_signal.append(np.mod(self.local_phase_signal[-1] + self.phase_offset, 2 * np.pi))
 
     
@@ -273,15 +278,3 @@ def compute_idx_min_distance(pos_signal, vel_signal, curr_pos, curr_vel) -> int:
     distances_pos = distances_pos / max(distances_pos, default=1)  # avoids dividing by zero
     distances_vel = distances_vel / max(distances_vel, default=1)
     return np.argmin(distances_pos + distances_vel)
-
-
-def lowpass_filter_phase(prev_phase:float, input_phase:float, time_step:float=0.01, time_constant:float=0.2) -> float:
-    if time_constant < time_step:
-        warnings.warn("time_constant must be >= time_step", UserWarning)
-        time_constant = time_step
-    if prev_phase - input_phase > np.pi:
-        return input_phase  # no filtering if a jump is detected
-    else:
-        gain = time_step / time_constant
-        filtered_phase = (1 - gain) * prev_phase + gain * input_phase
-        return np.mod(filtered_phase, 2 * np.pi)  # wrap into [0, 2π)
