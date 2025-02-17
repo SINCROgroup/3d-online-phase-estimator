@@ -20,31 +20,31 @@ time_const_lowpass_filter_phase   = 0.1    # [s]. Use None to disable. Must be l
 # is_use_baseline                = False  # True: tethered mode; False: untethered mode
 time_const_lowpass_filter_estimand_pos = 0
 
-# file_path_estimand  = r"data\san_giovanni_2024-10-10\spiral_fdl_3.csv"
-# # file_path_estimand  = r"data\san_giovanni_2024-10-10\clockwise_and_anticlockwise_circle_mc_1.csv"; listening_time = 15
-# rows_to_skip_estimand = [0, 1, 2] + list(range(4, 40))
-# col_names_pos_estimand = ['TX.3', 'TY.3', 'TZ.3']
-# time_step           = 0.01  # [s]
-# is_use_baseline = False
-# time_step_baseline  = 0.01
-# file_path_baseline  = r"data\san_giovanni_2024-10-10\spiral_ref.csv"
-# col_names_pos_baseline = ['x', 'y', 'z']
-# col_names_ref_frame_estimand_point_1 = ['TX', 'TY', 'TZ']        # belly
-# col_names_ref_frame_estimand_point_2 = ['TX.2', 'TY.2', 'TZ.2']  # right chest
-# col_names_ref_frame_estimand_point_3 = ['TX.1', 'TY.1', 'TZ.1']  # left chest
+file_path_estimand  = r"data\san_giovanni_2024-10-10\spiral_mc_3.csv"
+# file_path_estimand  = r"data\san_giovanni_2024-10-10\clockwise_and_anticlockwise_circle_mc_1.csv"; listening_time = 15
+rows_to_skip_estimand = [0, 1, 2] + list(range(4, 40))
+col_names_pos_estimand = ['TX.3', 'TY.3', 'TZ.3']
+time_step           = 0.01  # [s]
+is_use_baseline = True
+time_step_baseline  = 0.01
+file_path_baseline  = r"data\san_giovanni_2024-10-10\spiral_ref.csv"
+col_names_pos_baseline = ['x', 'y', 'z']
+col_names_ref_frame_estimand_point_1 = ['TX', 'TY', 'TZ']        # belly
+col_names_ref_frame_estimand_point_2 = ['TX.2', 'TY.2', 'TZ.2']  # right chest
+col_names_ref_frame_estimand_point_3 = ['TX.1', 'TY.1', 'TZ.1']  # left chest
 
 # file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX101_pelvic_balance_good.csv"; col_names_pos_estimand = ["HIP_R_X","HIP_R_Y","HIP_R_Z","ILIAC_R_X","ILIAC_R_Y","ILIAC_R_Z","ILIAC_L_X","ILIAC_L_Y","ILIAC_L_Z","HIP_L_X","HIP_L_Y","HIP_L_Z"];  look_behind_pcent = 5; look_ahead_pcent = 30; listening_time = 15; time_const_lowpass_filter_estimand_pos = 0.1
 # file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX102_pelvic_balance_bad.csv"; col_names_pos_estimand  = ["HIP_R_X","HIP_R_Y","HIP_R_Z","ILIAC_R_X","ILIAC_R_Y","ILIAC_R_Z","ILIAC_L_X","ILIAC_L_Y","ILIAC_L_Z","HIP_L_X","HIP_L_Y","HIP_L_Z"]; look_behind_pcent = 2; look_ahead_pcent = 30; listening_time = 30; time_const_lowpass_filter_estimand_pos = 0.1
 # file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX201_superman_good.csv"; col_names_pos_estimand = ["HAN_R_X","HAN_R_Y","HAN_R_Z", "HAN_L_X", "HAN_L_Y", "HAN_L_Z","ANK_R_X","ANK_R_Y","ANK_R_Z","ANK_L_X","ANK_L_Y","ANK_L_Z"];  look_behind_pcent = 5; look_ahead_pcent = 15; listening_time = 45; time_const_lowpass_filter_estimand_pos = 0.1
 # file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX202_superman_bad.csv"; col_names_pos_estimand  = ["HAN_R_X","HAN_R_Y","HAN_R_Z", "HAN_L_X", "HAN_L_Y", "HAN_L_Z","ANK_R_X","ANK_R_Y","ANK_R_Z","ANK_L_X","ANK_L_Y","ANK_L_Z"];  look_behind_pcent = 5; look_ahead_pcent = 15; listening_time = 25;  time_const_lowpass_filter_estimand_pos = 0.1
 # file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX301_bridge_good.csv"; col_names_pos_estimand = ["HIP_R_X","HIP_R_Y","HIP_R_Z","KNE_R_X","KNE_R_Y","KNE_R_Z","HIP_L_X","HIP_L_Y","HIP_L_Z","KNE_L_X","KNE_L_Y","KNE_L_Z"];  look_behind_pcent = 5; look_ahead_pcent = 30; listening_time = 30; time_const_lowpass_filter_estimand_pos = 0.1
-file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX302_bridge_bad.csv"; col_names_pos_estimand = ["HIP_R_X","HIP_R_Y","HIP_R_Z","KNE_R_X","KNE_R_Y","KNE_R_Z","HIP_L_X","HIP_L_Y","HIP_L_Z","KNE_L_X","KNE_L_Y","KNE_L_Z"];  look_behind_pcent = 2; look_ahead_pcent = 20; listening_time = 15; time_const_lowpass_filter_estimand_pos = 0.1
+# file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX302_bridge_bad.csv"; col_names_pos_estimand = ["HIP_R_X","HIP_R_Y","HIP_R_Z","KNE_R_X","KNE_R_Y","KNE_R_Z","HIP_L_X","HIP_L_Y","HIP_L_Z","KNE_L_X","KNE_L_Y","KNE_L_Z"];  look_behind_pcent = 2; look_ahead_pcent = 20; listening_time = 15; time_const_lowpass_filter_estimand_pos = 0.1
 # file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX401_plank_good.csv"; col_names_pos_estimand = ["HEAD_X","HEAD_Y","HEAD_Z","PELVIS_X","PELVIS_Y","PELVIS_Z"];  look_behind_pcent = 5; look_ahead_pcent = 15; listening_time = 22; time_const_lowpass_filter_estimand_pos = 0.1
 # file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX402_plank_bad.csv"; col_names_pos_estimand  = ["HEAD_X","HEAD_Y","HEAD_Z","PELVIS_X","PELVIS_Y","PELVIS_Z"];  discarded_time = 20; look_behind_pcent = 10; look_ahead_pcent = 40; listening_time = 8; time_const_lowpass_filter_estimand_pos = 0.1
-time_step          = 0.01
-time_step_baseline = 0.01
-rows_to_skip_estimand = list(range(0, 9))
-is_use_baseline = False
+# time_step          = 0.01
+# time_step_baseline = 0.01
+# rows_to_skip_estimand = list(range(0, 9))
+# is_use_baseline = False
 
 
 # Load data
@@ -141,11 +141,14 @@ plt.grid(True)
 
 
 # Create a 3D figure
-# fig = plt.figure()
-# ax = fig.add_subplot(111, projection='3d')
-# ax.plot(estimand_pos_signal[:,0], estimand_pos_signal[:,1], estimand_pos_signal[:,2], label="estimand position signal")
-# ax.set_xlabel('X');  ax.set_ylabel('Y');  ax.set_zlabel('Z')
-# plt.legend()
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+n_loop = 5
+first_idx = np.argmax( time_signal >= phase_estimator.delimiter_time_instants[n_loop-1])
+last_idx  = np.argmax( time_signal > phase_estimator.delimiter_time_instants[n_loop])
+ax.plot(estimand_pos_signal[first_idx:last_idx,0], estimand_pos_signal[first_idx:last_idx,1], estimand_pos_signal[first_idx:last_idx,2], label="estimand position signal")
+ax.set_xlabel('X');  ax.set_ylabel('Y');  ax.set_zlabel('Z')
+plt.legend()
 
 
 plt.show()

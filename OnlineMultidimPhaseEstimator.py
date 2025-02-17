@@ -118,6 +118,7 @@ class OnlineMultidimPhaseEstimator:
                         min_duration_quasiperiod=self.min_duration_quasiperiod)
                     self.update_look_ranges()
 
+                    self.delimiter_time_instants.append(float(self.local_time_signal[self.idx_time_start_listening] + self.initial_time))
                     self.delimiter_time_instants.append(float(self.local_time_signal[len(self.latest_pos_loop) + self.idx_time_start_listening] + self.initial_time))
                     self.is_first_loop_estimated = True
 
@@ -195,10 +196,9 @@ class OnlineMultidimPhaseEstimator:
         z_axis = z_axis / np.linalg.norm(z_axis)
         y_axis = np.cross(z_axis, x_axis)
         y_axis = y_axis / np.linalg.norm(y_axis)
-        rotation_matrix = np.vstack([x_axis, y_axis, z_axis])
+        rotation_matrix = np.vstack([x_axis, y_axis, z_axis])   # TODO check
         
         rotated_loop = self.latest_pos_loop[:, 0:3] @ rotation_matrix.T
-        #rotated_loop = self.latest_pos_loop[:, 0:self.n_dim] @ np.kron(np.eye(int(self.n_dim/3)), rotation_matrix.T)  # might manage the case of n_dims > 3
 
         centroid = np.mean(rotated_loop, axis=0)
         rotated_centered_loop = rotated_loop - centroid
