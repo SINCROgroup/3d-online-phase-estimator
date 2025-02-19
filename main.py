@@ -3,7 +3,6 @@ import pandas as pd
 from scipy.signal import hilbert
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 from LowPassFilters import LowPassFilter
 
 from OnlineMultidimPhaseEstimator import OnlineMultidimPhaseEstimator
@@ -11,17 +10,18 @@ from OnlineMultidimPhaseEstimator import OnlineMultidimPhaseEstimator
 
 # Parameters
 # ------------------------------------------------
-discarded_time                 = 1      # [s] all time between start and discarded_time (excluded) is discarded
+discarded_time                 = 0      # [s] all time between start and discarded_time (excluded) is discarded
 min_duration_first_quasiperiod = 0      # [s]
 listening_time                 = 10     # [s] waits this time before estimating first loop must contain 2 quasiperiods
 look_behind_pcent              = 5      # % of last completed loop before last nearest point on which estimate the new phase
 look_ahead_pcent               = 15     # % of last completed loop after  last nearest point on which estimate the new phase
 time_const_lowpass_filter_phase   = 0.1    # [s]. Use None to disable. Must be larger than time step
-# is_use_baseline                = False  # True: tethered mode; False: untethered mode
+# is_use_baseline                = True  # True: tethered mode; False: untethered mode
 time_const_lowpass_filter_estimand_pos = 0
 
-file_path_estimand  = r"data\san_giovanni_2024-10-10\spiral_mc_3.csv"
+file_path_estimand  = r"data\san_giovanni_2024-10-10\spiral_mc_1.csv"
 # file_path_estimand  = r"data\san_giovanni_2024-10-10\clockwise_and_anticlockwise_circle_mc_1.csv"; listening_time = 15
+# file_path_estimand  = r"data\san_giovanni_2024-10-10\macarena_mc_2.csv"; listening_time = 15
 rows_to_skip_estimand = [0, 1, 2] + list(range(4, 40))
 col_names_pos_estimand = ['TX.3', 'TY.3', 'TZ.3']
 time_step           = 0.01  # [s]
@@ -33,18 +33,17 @@ col_names_ref_frame_estimand_point_1 = ['TX', 'TY', 'TZ']        # belly
 col_names_ref_frame_estimand_point_2 = ['TX.2', 'TY.2', 'TZ.2']  # right chest
 col_names_ref_frame_estimand_point_3 = ['TX.1', 'TY.1', 'TZ.1']  # left chest
 
-# file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX101_pelvic_balance_good.csv"; col_names_pos_estimand = ["HIP_R_X","HIP_R_Y","HIP_R_Z","ILIAC_R_X","ILIAC_R_Y","ILIAC_R_Z","ILIAC_L_X","ILIAC_L_Y","ILIAC_L_Z","HIP_L_X","HIP_L_Y","HIP_L_Z"];  look_behind_pcent = 5; look_ahead_pcent = 30; listening_time = 15; time_const_lowpass_filter_estimand_pos = 0.1
-# file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX102_pelvic_balance_bad.csv"; col_names_pos_estimand  = ["HIP_R_X","HIP_R_Y","HIP_R_Z","ILIAC_R_X","ILIAC_R_Y","ILIAC_R_Z","ILIAC_L_X","ILIAC_L_Y","ILIAC_L_Z","HIP_L_X","HIP_L_Y","HIP_L_Z"]; look_behind_pcent = 2; look_ahead_pcent = 30; listening_time = 30; time_const_lowpass_filter_estimand_pos = 0.1
+# file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX101_pelvic_balance_good.csv"; col_names_pos_estimand = ["HIP_R_X","HIP_R_Y","HIP_R_Z","ILIAC_R_X","ILIAC_R_Y","ILIAC_R_Z","ILIAC_L_X","ILIAC_L_Y","ILIAC_L_Z","HIP_L_X","HIP_L_Y","HIP_L_Z"];  look_behind_pcent = 5; look_ahead_pcent = 15; listening_time = 15; time_const_lowpass_filter_estimand_pos = 0.1
+# file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX102_pelvic_balance_bad.csv"; col_names_pos_estimand  = ["HIP_R_X","HIP_R_Y","HIP_R_Z","ILIAC_R_X","ILIAC_R_Y","ILIAC_R_Z","ILIAC_L_X","ILIAC_L_Y","ILIAC_L_Z","HIP_L_X","HIP_L_Y","HIP_L_Z"]; look_behind_pcent = 2; look_ahead_pcent = 15; listening_time = 30; time_const_lowpass_filter_estimand_pos = 0.1
 # file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX201_superman_good.csv"; col_names_pos_estimand = ["HAN_R_X","HAN_R_Y","HAN_R_Z", "HAN_L_X", "HAN_L_Y", "HAN_L_Z","ANK_R_X","ANK_R_Y","ANK_R_Z","ANK_L_X","ANK_L_Y","ANK_L_Z"];  look_behind_pcent = 5; look_ahead_pcent = 15; listening_time = 45; time_const_lowpass_filter_estimand_pos = 0.1
 # file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX202_superman_bad.csv"; col_names_pos_estimand  = ["HAN_R_X","HAN_R_Y","HAN_R_Z", "HAN_L_X", "HAN_L_Y", "HAN_L_Z","ANK_R_X","ANK_R_Y","ANK_R_Z","ANK_L_X","ANK_L_Y","ANK_L_Z"];  look_behind_pcent = 5; look_ahead_pcent = 15; listening_time = 25;  time_const_lowpass_filter_estimand_pos = 0.1
 # file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX301_bridge_good.csv"; col_names_pos_estimand = ["HIP_R_X","HIP_R_Y","HIP_R_Z","KNE_R_X","KNE_R_Y","KNE_R_Z","HIP_L_X","HIP_L_Y","HIP_L_Z","KNE_L_X","KNE_L_Y","KNE_L_Z"];  look_behind_pcent = 5; look_ahead_pcent = 30; listening_time = 30; time_const_lowpass_filter_estimand_pos = 0.1
-# file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX302_bridge_bad.csv"; col_names_pos_estimand = ["HIP_R_X","HIP_R_Y","HIP_R_Z","KNE_R_X","KNE_R_Y","KNE_R_Z","HIP_L_X","HIP_L_Y","HIP_L_Z","KNE_L_X","KNE_L_Y","KNE_L_Z"];  look_behind_pcent = 2; look_ahead_pcent = 20; listening_time = 15; time_const_lowpass_filter_estimand_pos = 0.1
+# file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX302_bridge_bad.csv"; col_names_pos_estimand = ["HIP_R_X","HIP_R_Y","HIP_R_Z","KNE_R_X","KNE_R_Y","KNE_R_Z","HIP_L_X","HIP_L_Y","HIP_L_Z","KNE_L_X","KNE_L_Y","KNE_L_Z"];  look_behind_pcent = 2; look_ahead_pcent = 15; listening_time = 15; time_const_lowpass_filter_estimand_pos = 0.1
 # file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX401_plank_good.csv"; col_names_pos_estimand = ["HEAD_X","HEAD_Y","HEAD_Z","PELVIS_X","PELVIS_Y","PELVIS_Z"];  look_behind_pcent = 5; look_ahead_pcent = 15; listening_time = 22; time_const_lowpass_filter_estimand_pos = 0.1
 # file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX402_plank_bad.csv"; col_names_pos_estimand  = ["HEAD_X","HEAD_Y","HEAD_Z","PELVIS_X","PELVIS_Y","PELVIS_Z"];  discarded_time = 20; look_behind_pcent = 10; look_ahead_pcent = 40; listening_time = 8; time_const_lowpass_filter_estimand_pos = 0.1
-# time_step          = 0.01
-# time_step_baseline = 0.01
 # rows_to_skip_estimand = list(range(0, 9))
-# is_use_baseline = False
+# time_step = 0.01
+# is_use_baseline = False;  time_step_baseline = None
 
 
 # Load data
@@ -56,6 +55,8 @@ estimand_pos_signal = np.array(df_estimand_pos)
 
 time_signal = np.arange(0, time_step * len(df_estimand_pos), time_step)
 
+ref_frame_estimand_points = []
+baseline_pos_loop = None
 if is_use_baseline:
     df_baseline       = pd.read_csv(file_path_baseline)
     baseline_pos_loop = np.array(df_baseline[col_names_pos_baseline])
@@ -65,14 +66,9 @@ if is_use_baseline:
     for first_idx_without_na in range(len(df_estimand)):
         if df_estimand[col_names_ref_frame_estimand_points].iloc[first_idx_without_na].notna().all():
             break
-    ref_frame_estimand_point_1 = np.array(df_estimand[col_names_ref_frame_estimand_point_1].iloc[first_idx_without_na])
-    ref_frame_estimand_point_2 = np.array(df_estimand[col_names_ref_frame_estimand_point_2].iloc[first_idx_without_na])
-    ref_frame_estimand_point_3 = np.array(df_estimand[col_names_ref_frame_estimand_point_3].iloc[first_idx_without_na])
-else:
-    baseline_pos_loop = None
-    ref_frame_estimand_point_1 = None
-    ref_frame_estimand_point_2 = None
-    ref_frame_estimand_point_3 = None
+    ref_frame_estimand_points.append( np.array(df_estimand[col_names_ref_frame_estimand_point_1].iloc[first_idx_without_na]) )
+    ref_frame_estimand_points.append( np.array(df_estimand[col_names_ref_frame_estimand_point_2].iloc[first_idx_without_na]) )
+    ref_frame_estimand_points.append( np.array(df_estimand[col_names_ref_frame_estimand_point_3].iloc[first_idx_without_na]) )
 
 # Filter input
 if time_const_lowpass_filter_estimand_pos > 0:
@@ -97,9 +93,7 @@ phase_estimator = OnlineMultidimPhaseEstimator(
     is_use_baseline                = is_use_baseline,
     baseline_pos_loop              = baseline_pos_loop,
     time_step_baseline             = time_step_baseline,
-    ref_frame_point_1              = ref_frame_estimand_point_3,
-    ref_frame_point_2              = ref_frame_estimand_point_2,
-    ref_frame_point_3              = ref_frame_estimand_point_1
+    ref_frame_points              = ref_frame_estimand_points
 )
 phase_estimand_online = np.full(n_time_instants, None)
 for i_t in range(n_time_instants - 1):
@@ -141,14 +135,14 @@ plt.grid(True)
 
 
 # Create a 3D figure
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-n_loop = 5
-first_idx = np.argmax( time_signal >= phase_estimator.delimiter_time_instants[n_loop-1])
-last_idx  = np.argmax( time_signal > phase_estimator.delimiter_time_instants[n_loop])
-ax.plot(estimand_pos_signal[first_idx:last_idx,0], estimand_pos_signal[first_idx:last_idx,1], estimand_pos_signal[first_idx:last_idx,2], label="estimand position signal")
-ax.set_xlabel('X');  ax.set_ylabel('Y');  ax.set_zlabel('Z')
-plt.legend()
+# fig = plt.figure()
+# ax = fig.add_subplot(111, projection='3d')
+# n_loop = 2
+# first_idx = np.argmax( time_signal >= phase_estimator.delimiter_time_instants[n_loop-1])
+# last_idx  = np.argmax( time_signal > phase_estimator.delimiter_time_instants[n_loop])
+# ax.plot(estimand_pos_signal[first_idx:last_idx,0], estimand_pos_signal[first_idx:last_idx,1], estimand_pos_signal[first_idx:last_idx,2], label="estimand position signal")
+# ax.set_xlabel('X');  ax.set_ylabel('Y');  ax.set_zlabel('Z')
+# plt.legend()
 
 
 plt.show()
