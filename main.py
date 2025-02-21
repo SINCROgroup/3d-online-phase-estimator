@@ -1,11 +1,10 @@
 import numpy as np
 import pandas as pd
-from scipy.signal import hilbert
-from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
-from LowPassFilters import LowPassFilter
 
+from wrap_functions import wrap_to_pi, wrap_to_2pi
 from OnlineMultidimPhaseEstimator import OnlineMultidimPhaseEstimator
+from PCAHilbertPhaseEstimator import PCAHilbertPhaseEstimator
 
 
 # Parameters
@@ -17,7 +16,7 @@ look_behind_pcent              = 5      # % of last completed loop before last n
 look_ahead_pcent               = 15     # % of last completed loop after  last nearest point on which estimate the new phase
 time_const_lowpass_filter_phase   = 0.1    # [s]. Use None to disable. Must be larger than time step
 # is_use_baseline                = True  # True: tethered mode; False: untethered mode
-time_const_lowpass_filter_estimand_pos = 0
+time_const_lowpass_filter_estimand_pos = 0.01
 
 file_path_estimand  = r"data\san_giovanni_2024-10-10\spiral_mc_1.csv"
 # file_path_estimand  = r"data\san_giovanni_2024-10-10\clockwise_and_anticlockwise_circle_mc_1.csv"; listening_time = 15
@@ -96,31 +95,14 @@ for i_t in range(n_time_instants - 1):
 
 # Offline estimator
 # ------------------------------------------------
-# Filter input
-if not time_const_lowpass_filter_estimand_pos in {None, 0, -1}:
-    estimand_pos_signal_filtered = np.full_like(estimand_pos_signal, np.nan)
-    estimand_pos_signal_filtered[0, :] = estimand_pos_signal[0, :]
-    low_pass_filter_estimand = LowPassFilter(estimand_pos_signal[0, :], time_signal[1] - time_signal[0], time_const=time_const_lowpass_filter_estimand_pos)
-    for i_t in range(1, len(estimand_pos_signal)):
-        low_pass_filter_estimand.change_time_step(float(time_signal[i_t] - time_signal[i_t-1]))
-        estimand_pos_signal_filtered[i_t, :] = low_pass_filter_estimand.update_state(estimand_pos_signal[i_t, :])
-else:
-    estimand_pos_signal_filtered = estimand_pos_signal.copy()
+pca_hilbert_phase_estimator = PCAHilbertPhaseEstimator(estimand_pos_signal, time_signal, time_const_lowpass_filter_estimand_pos)
+phase_estimand_offline = pca_hilbert_phase_estimator.compute_phase()
 
-means_estimand_pos = np.mean(estimand_pos_signal_filtered, axis=0)  # TODO make this a function or class
-estimand_pos_centered = estimand_pos_signal_filtered - means_estimand_pos
-pca_model = PCA(n_components=1)
-pca_model.fit(estimand_pos_centered)
-principal_components = pca_model.transform(estimand_pos_centered)
-principal_component_main = principal_components[:, 0]
-
-phase_estimand_offline = np.unwrap(np.angle(hilbert(principal_component_main)))
-
+phase_estimand_offline = np.unwrap(phase_estimand_offline)
 initial_phase_estimand_online  = phase_estimand_online [int((listening_time + discarded_time) / time_step) + 1]   # + 1 necessary because, e.g., if listening_time + discarded_time = 4, we want to start at time = idx = 5
 initial_phase_estimand_offline = phase_estimand_offline[int((listening_time + discarded_time) / time_step) + 1]
 phase_estimand_offline += initial_phase_estimand_online - initial_phase_estimand_offline
-
-phase_estimand_offline = np.mod(phase_estimand_offline, 2 * np.pi)
+phase_estimand_offline = wrap_to_2pi(phase_estimand_offline)
 
 
 # Figure

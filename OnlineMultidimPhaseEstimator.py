@@ -2,7 +2,7 @@ import warnings
 import numpy as np
 from scipy.signal import detrend, find_peaks
 
-from LowPassFilters import LowPassFilter, LowPassFilterPhase
+from low_pass_filters import LowPassFilter, LowPassFilterPhase
 
 
 ##################################################

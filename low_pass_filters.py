@@ -1,8 +1,6 @@
 import warnings
 import numpy as np
-
-def wrap_to_2pi(x): return np.mod(x, 2 * np.pi)
-def wrap_to_pi(x):  return np.mod(x + np.pi, 2 * np.pi) - np.pi
+from wrap_functions import wrap_to_pi, wrap_to_2pi
 
 
 class LowPassFilter:
@@ -46,3 +44,13 @@ class LowPassFilterPhase(LowPassFilter):
         else:                                 LowPassFilter.update_state(self, input_)
         self.set_curr_state(self.curr_state)  # apply wrapping
         return self.curr_state
+
+
+def filter_signal(signal_to_filter:np.ndarray, time_signal:np.ndarray, time_const:float) -> np.ndarray:
+    signal_filtered = np.full_like(signal_to_filter, np.nan)
+    signal_filtered[0, :] = signal_to_filter[0, :]
+    low_pass_filter_estimand = LowPassFilter(signal_to_filter[0, :], float(time_signal[1] - time_signal[0]), time_const=time_const)
+    for i_t in range(1, len(signal_to_filter)):
+        low_pass_filter_estimand.change_time_step(float(time_signal[i_t] - time_signal[i_t-1]))
+        signal_filtered[i_t, :] = low_pass_filter_estimand.update_state(signal_to_filter[i_t, :])
+    return signal_filtered
