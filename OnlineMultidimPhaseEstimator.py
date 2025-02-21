@@ -204,17 +204,19 @@ class OnlineMultidimPhaseEstimator:
 
     
     def compute_phase_offset(self) -> None:
+        # TODO edit point. path A: comment next five lines. path B: uncoment
+        x_axis_baseline, y_axis_baseline, z_axis_baseline = calculate_axes(self.ref_frame_baseline_points)
+        rotat_matrix_global_to_ego_baseline = np.vstack([x_axis_baseline, y_axis_baseline, z_axis_baseline]).T
+        self.baseline_pos_loop =  self.baseline_pos_loop[:, 0:3] @ rotat_matrix_global_to_ego_baseline
+        centroid_baseline = np.mean(self.baseline_pos_loop, axis=0)
+        self.baseline_pos_loop = self.baseline_pos_loop - centroid_baseline
+
         x_axis_estimand, y_axis_estimand, z_axis_estimand = calculate_axes(self.ref_frame_estimand_points)
         rotat_matrix_global_to_ego_estimand = np.vstack([x_axis_estimand, y_axis_estimand, z_axis_estimand]).T
         rotated_loop = self.latest_pos_loop[:, 0:3] @ rotat_matrix_global_to_ego_estimand
 
-        # TODO edit point. path A: comment next three lines. path B: uncoment
-        x_axis_baseline, y_axis_baseline, z_axis_baseline = calculate_axes(self.ref_frame_baseline_points)
-        rotat_matrix_global_to_ego_baseline = np.vstack([x_axis_baseline, y_axis_baseline, z_axis_baseline]).T
-        self.baseline_pos_loop =  self.baseline_pos_loop[:, 0:3] @ rotat_matrix_global_to_ego_baseline
-
-        centroid = np.mean(rotated_loop, axis=0)
-        rotated_centered_loop = rotated_loop - centroid
+        centroid_estimand = np.mean(rotated_loop, axis=0)
+        rotated_centered_loop = rotated_loop - centroid_estimand
 
         scale_factors = np.std(self.baseline_pos_loop, axis=0) / np.std(rotated_centered_loop, axis=0)
         scale_factors[np.isnan(scale_factors)] = 1 
