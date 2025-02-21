@@ -22,7 +22,8 @@ class OnlineMultidimPhaseEstimator:
                  is_use_baseline                 = False,
                  baseline_pos_loop               = None,
                  time_step_baseline              = 0.01,
-                 ref_frame_points                = None):
+                 ref_frame_estimand_points       = None,
+                 ref_frame_baseline_points       = None):
 
         self.is_first_loop_estimated = False
         assert look_ahead_pcent + look_behind_pcent <= 100, "look_ahead_pcent + look_behind_pcent must not exceed 100"
@@ -42,10 +43,11 @@ class OnlineMultidimPhaseEstimator:
         if is_use_baseline:
             assert n_dims_estimand_pos == 3,      "Baseline mode can be used only with n_dim = 3"
             assert baseline_pos_loop is not None, "Baseline mode was required but baseline_pos_loop was not provided"
-            assert ref_frame_points  is not None, "Baseline mode was required but ref_frame_points was not provided"
+            assert ref_frame_estimand_points is not None, "Baseline mode was required but ref_frame_points was not provided"
 
             self.baseline_pos_loop = baseline_pos_loop.copy()
-            self.ref_frame_points  = ref_frame_points.copy()
+            self.ref_frame_estimand_points = ref_frame_estimand_points.copy()
+            self.ref_frame_baseline_points = ref_frame_baseline_points.copy()
 
         if time_const_lowpass_filter_phase in {None, 0, -1}:
             self.is_use_lowpass_filter_phase = False
@@ -202,10 +204,14 @@ class OnlineMultidimPhaseEstimator:
 
     
     def compute_phase_offset(self) -> None:
-        x_axis, y_axis, z_axis = calculate_axes(self.ref_frame_points)
-        rotation_matrix = np.vstack([x_axis, y_axis, z_axis])
-        
-        rotated_loop = self.latest_pos_loop[:, 0:3] @ rotation_matrix.T
+        x_axis_estimand, y_axis_estimand, z_axis_estimand = calculate_axes(self.ref_frame_estimand_points)
+        rotat_matrix_global_to_ego_estimand = np.vstack([x_axis_estimand, y_axis_estimand, z_axis_estimand]).T
+        rotated_loop = self.latest_pos_loop[:, 0:3] @ rotat_matrix_global_to_ego_estimand
+
+        # TODO edit point. path A: comment next three lines. path B: uncoment
+        # x_axis_baseline, y_axis_baseline, z_axis_baseline = calculate_axes(self.ref_frame_baseline_points)
+        # rotat_matrix_global_to_ego_baseline = np.vstack([x_axis_baseline, y_axis_baseline, z_axis_baseline]).T
+        # self.baseline_pos_loop =  self.baseline_pos_loop[:, 0:3] @ rotat_matrix_global_to_ego_baseline
 
         centroid = np.mean(rotated_loop, axis=0)
         rotated_centered_loop = rotated_loop - centroid
@@ -287,11 +293,12 @@ def compute_idx_min_distance(pos_signal, vel_signal, curr_pos, curr_vel) -> int:
     return np.argmin(distances_pos + distances_vel)
 
 
-def calculate_axes(ref_frame_points):
-	x_axis = (ref_frame_points[1] - ref_frame_points[0]) / np.linalg.norm(ref_frame_points[1] - ref_frame_points[0])
-	z_vector = ref_frame_points[2] - ref_frame_points[1]
-	z_axis = z_vector - np.dot(z_vector, x_axis) * x_axis
-	z_axis = z_axis / np.linalg.norm(z_axis)
-	y_axis = np.cross(z_axis, x_axis)
-	y_axis = y_axis / np.linalg.norm(y_axis)
-	return x_axis, y_axis, z_axis
+def calculate_axes(points):
+    """Computes a frame of reference, given 3 non collinear points"""
+    x_axis = (points[1] - points[0]) / np.linalg.norm(points[1] - points[0])
+    z_vector = points[2] - points[1]
+    z_axis = z_vector - np.dot(z_vector, x_axis) * x_axis
+    z_axis = z_axis / np.linalg.norm(z_axis)
+    y_axis = np.cross(z_axis, x_axis)
+    y_axis = y_axis / np.linalg.norm(y_axis)
+    return x_axis, y_axis, z_axis

@@ -9,13 +9,13 @@ from compute_phase_via_pca_hilbert import compute_phase_via_pca_hilbert
 
 # Parameters
 # ------------------------------------------------
-discarded_time                 = 0      # [s] all time between start and discarded_time (excluded) is discarded
+discarded_time                 = 1      # [s] all time between start and discarded_time (excluded) is discarded
 min_duration_first_quasiperiod = 0      # [s]
 listening_time                 = 10     # [s] waits this time before estimating first loop must contain 2 quasiperiods
 look_behind_pcent              = 5      # % of last completed loop before last nearest point on which estimate the new phase
 look_ahead_pcent               = 15     # % of last completed loop after last nearest point on which estimate the new phase
 time_const_lowpass_filter_phase   = 0.1    # [s]. Use None to disable. Must be larger than time step
-# is_use_baseline                = True  # True: tethered mode; False: untethered mode
+is_use_baseline                = True  # True: tethered mode; False: untethered mode
 time_const_lowpass_filter_estimand_pos = 0.01
 
 file_path_estimand  = r"data\san_giovanni_2024-10-10\spiral_mc_1.csv"
@@ -26,11 +26,11 @@ col_names_pos_estimand = ['TX.3', 'TY.3', 'TZ.3']
 time_step           = 0.01  # [s]
 is_use_baseline = True
 time_step_baseline  = 0.01
-file_path_baseline  = r"data\san_giovanni_2024-10-10\spiral_ref.csv"
+file_path_baseline  = r"data\san_giovanni_2024-10-10\spiral_ref.csv"       # TODO edit point. path A
+# file_path_baseline  = r"data\san_giovanni_2024-10-10\spiral_baseline.csv"    # TODO edit point. path B
 col_names_pos_baseline = ['x', 'y', 'z']
-col_names_ref_frame_estimand_point_1 = ['TX', 'TY', 'TZ']        # belly
-col_names_ref_frame_estimand_point_2 = ['TX.2', 'TY.2', 'TZ.2']  # right chest
-col_names_ref_frame_estimand_point_3 = ['TX.1', 'TY.1', 'TZ.1']  # left chest
+col_names_ref_frame_estimand_points = [['TX', 'TY', 'TZ'], ['TX.2', 'TY.2', 'TZ.2'], ['TX.1', 'TY.1', 'TZ.1']]        # belly, # right chest, # left chest
+col_names_ref_frame_baseline_points = [['p1_x','p1_y','p1_z'],['p2_x','p2_y','p2_z'],['p3_x','p3_y','p3_z']]
 
 # file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX101_pelvic_balance_good.csv"; col_names_pos_estimand = ["HIP_R_X","HIP_R_Y","HIP_R_Z","ILIAC_R_X","ILIAC_R_Y","ILIAC_R_Z","ILIAC_L_X","ILIAC_L_Y","ILIAC_L_Z","HIP_L_X","HIP_L_Y","HIP_L_Z"];  look_behind_pcent = 5; look_ahead_pcent = 15; listening_time = 15; time_const_lowpass_filter_estimand_pos = 0.1
 # file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX102_pelvic_balance_bad.csv"; col_names_pos_estimand  = ["HIP_R_X","HIP_R_Y","HIP_R_Z","ILIAC_R_X","ILIAC_R_Y","ILIAC_R_Z","ILIAC_L_X","ILIAC_L_Y","ILIAC_L_Z","HIP_L_X","HIP_L_Y","HIP_L_Z"]; look_behind_pcent = 2; look_ahead_pcent = 15; listening_time = 30; time_const_lowpass_filter_estimand_pos = 0.1
@@ -54,21 +54,31 @@ estimand_pos_signal = np.array(df_estimand_pos)
 
 time_signal = np.arange(0, time_step * len(df_estimand_pos), time_step)
 
-ref_frame_estimand_points = []
+
+def extract_points_from_df(df, col_names_points):
+    col_names_points_flattened = []
+    for cnp in col_names_points:  col_names_points_flattened.extend(cnp)
+    first_idx_without_na = 0
+    for first_idx_without_na in range(len(df)):
+        if df[col_names_points_flattened].iloc[first_idx_without_na].notna().all():
+            break
+    points = []
+    for i in range(len(col_names_points)):
+        points.append(np.array(df[col_names_points[i]].iloc[first_idx_without_na]))
+    return points
+
 if is_use_baseline:
+    ref_frame_estimand_points = extract_points_from_df(df_estimand, col_names_ref_frame_estimand_points)
+
     df_baseline       = pd.read_csv(file_path_baseline)
     baseline_pos_loop = np.array(df_baseline[col_names_pos_baseline])
-
-    col_names_ref_frame_estimand_points = col_names_ref_frame_estimand_point_1 + col_names_ref_frame_estimand_point_2 + col_names_ref_frame_estimand_point_3
-    first_idx_without_na = 0
-    for first_idx_without_na in range(len(df_estimand)):
-        if df_estimand[col_names_ref_frame_estimand_points].iloc[first_idx_without_na].notna().all():
-            break
-    ref_frame_estimand_points.append( np.array(df_estimand[col_names_ref_frame_estimand_point_1].iloc[first_idx_without_na]) )
-    ref_frame_estimand_points.append( np.array(df_estimand[col_names_ref_frame_estimand_point_2].iloc[first_idx_without_na]) )
-    ref_frame_estimand_points.append( np.array(df_estimand[col_names_ref_frame_estimand_point_3].iloc[first_idx_without_na]) )
+    # ref_frame_baseline_points = extract_points_from_df(df_baseline, col_names_ref_frame_baseline_points)  # TODO edit point. path B
+    ref_frame_baseline_points = ref_frame_estimand_points.copy()                                            # TODO edit point. path A
 else:
     baseline_pos_loop = None
+    ref_frame_estimand_points = []
+    ref_frame_baseline_points = []
+
 
 # Online estimator
 # ------------------------------------------------
@@ -86,7 +96,8 @@ phase_estimator = OnlineMultidimPhaseEstimator(
     is_use_baseline                 = is_use_baseline,
     baseline_pos_loop               = baseline_pos_loop,
     time_step_baseline              = time_step_baseline,
-    ref_frame_points                = ref_frame_estimand_points
+    ref_frame_estimand_points       = ref_frame_estimand_points,
+    ref_frame_baseline_points       = ref_frame_baseline_points,
 )
 phase_estimand_online = np.full(n_time_instants, None)
 for i_t in range(n_time_instants - 1):
