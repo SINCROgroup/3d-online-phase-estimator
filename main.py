@@ -2,9 +2,9 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from wrap_functions import wrap_to_pi, wrap_to_2pi
+from wrap_functions import wrap_to_2pi
 from OnlineMultidimPhaseEstimator import OnlineMultidimPhaseEstimator
-from PCAHilbertPhaseEstimator import PCAHilbertPhaseEstimator
+from compute_phase_via_pca_hilbert import compute_phase_via_pca_hilbert
 
 
 # Parameters
@@ -13,7 +13,7 @@ discarded_time                 = 0      # [s] all time between start and discard
 min_duration_first_quasiperiod = 0      # [s]
 listening_time                 = 10     # [s] waits this time before estimating first loop must contain 2 quasiperiods
 look_behind_pcent              = 5      # % of last completed loop before last nearest point on which estimate the new phase
-look_ahead_pcent               = 15     # % of last completed loop after  last nearest point on which estimate the new phase
+look_ahead_pcent               = 15     # % of last completed loop after last nearest point on which estimate the new phase
 time_const_lowpass_filter_phase   = 0.1    # [s]. Use None to disable. Must be larger than time step
 # is_use_baseline                = True  # True: tethered mode; False: untethered mode
 time_const_lowpass_filter_estimand_pos = 0.01
@@ -55,7 +55,6 @@ estimand_pos_signal = np.array(df_estimand_pos)
 time_signal = np.arange(0, time_step * len(df_estimand_pos), time_step)
 
 ref_frame_estimand_points = []
-baseline_pos_loop = None
 if is_use_baseline:
     df_baseline       = pd.read_csv(file_path_baseline)
     baseline_pos_loop = np.array(df_baseline[col_names_pos_baseline])
@@ -68,7 +67,8 @@ if is_use_baseline:
     ref_frame_estimand_points.append( np.array(df_estimand[col_names_ref_frame_estimand_point_1].iloc[first_idx_without_na]) )
     ref_frame_estimand_points.append( np.array(df_estimand[col_names_ref_frame_estimand_point_2].iloc[first_idx_without_na]) )
     ref_frame_estimand_points.append( np.array(df_estimand[col_names_ref_frame_estimand_point_3].iloc[first_idx_without_na]) )
-
+else:
+    baseline_pos_loop = None
 
 # Online estimator
 # ------------------------------------------------
@@ -95,8 +95,7 @@ for i_t in range(n_time_instants - 1):
 
 # Offline estimator
 # ------------------------------------------------
-pca_hilbert_phase_estimator = PCAHilbertPhaseEstimator(estimand_pos_signal, time_signal, time_const_lowpass_filter_estimand_pos)
-phase_estimand_offline = pca_hilbert_phase_estimator.compute_phase()
+phase_estimand_offline = compute_phase_via_pca_hilbert(estimand_pos_signal, time_signal, time_const_lowpass_filter_estimand_pos)
 
 phase_estimand_offline = np.unwrap(phase_estimand_offline)
 initial_phase_estimand_online  = phase_estimand_online [int((listening_time + discarded_time) / time_step) + 1]   # + 1 necessary because, e.g., if listening_time + discarded_time = 4, we want to start at time = idx = 5
