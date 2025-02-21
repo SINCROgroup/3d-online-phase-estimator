@@ -26,8 +26,8 @@ col_names_pos_estimand = ['TX.3', 'TY.3', 'TZ.3']
 time_step           = 0.01  # [s]
 is_use_baseline = True
 time_step_baseline  = 0.01
-file_path_baseline  = r"data\san_giovanni_2024-10-10\spiral_ref.csv"       # TODO edit point. path A
-# file_path_baseline  = r"data\san_giovanni_2024-10-10\spiral_baseline.csv"    # TODO edit point. path B
+# file_path_baseline  = r"data\san_giovanni_2024-10-10\spiral_ref.csv"       # TODO edit point. path A
+file_path_baseline  = r"data\san_giovanni_2024-10-10\spiral_baseline.csv"    # TODO edit point. path B
 col_names_pos_baseline = ['x', 'y', 'z']
 col_names_ref_frame_estimand_points = [['TX', 'TY', 'TZ'], ['TX.2', 'TY.2', 'TZ.2'], ['TX.1', 'TY.1', 'TZ.1']]        # belly, # right chest, # left chest
 col_names_ref_frame_baseline_points = [['p1_x','p1_y','p1_z'],['p2_x','p2_y','p2_z'],['p3_x','p3_y','p3_z']]
@@ -38,7 +38,7 @@ col_names_ref_frame_baseline_points = [['p1_x','p1_y','p1_z'],['p2_x','p2_y','p2
 # file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX202_superman_bad.csv"; col_names_pos_estimand  = ["HAN_R_X","HAN_R_Y","HAN_R_Z", "HAN_L_X", "HAN_L_Y", "HAN_L_Z","ANK_R_X","ANK_R_Y","ANK_R_Z","ANK_L_X","ANK_L_Y","ANK_L_Z"];  look_behind_pcent = 5; look_ahead_pcent = 15; listening_time = 25;  time_const_lowpass_filter_estimand_pos = 0.1
 # file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX301_bridge_good.csv"; col_names_pos_estimand = ["HIP_R_X","HIP_R_Y","HIP_R_Z","KNE_R_X","KNE_R_Y","KNE_R_Z","HIP_L_X","HIP_L_Y","HIP_L_Z","KNE_L_X","KNE_L_Y","KNE_L_Z"];  look_behind_pcent = 5; look_ahead_pcent = 30; listening_time = 30; time_const_lowpass_filter_estimand_pos = 0.1
 # file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX302_bridge_bad.csv"; col_names_pos_estimand = ["HIP_R_X","HIP_R_Y","HIP_R_Z","KNE_R_X","KNE_R_Y","KNE_R_Z","HIP_L_X","HIP_L_Y","HIP_L_Z","KNE_L_X","KNE_L_Y","KNE_L_Z"];  look_behind_pcent = 2; look_ahead_pcent = 15; listening_time = 15; time_const_lowpass_filter_estimand_pos = 0.1
-# file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX401_plank_good.csv"; col_names_pos_estimand = ["HEAD_X","HEAD_Y","HEAD_Z","PELVIS_X","PELVIS_Y","PELVIS_Z"];  look_behind_pcent = 5; look_ahead_pcent = 15; listening_time = 22; time_const_lowpass_filter_estimand_pos = 0.1
+# file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX401_plank_good.csv"; col_names_pos_esti mand = ["HEAD_X","HEAD_Y","HEAD_Z","PELVIS_X","PELVIS_Y","PELVIS_Z"];  look_behind_pcent = 5; look_ahead_pcent = 15; listening_time = 22; time_const_lowpass_filter_estimand_pos = 0.1
 # file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX402_plank_bad.csv"; col_names_pos_estimand  = ["HEAD_X","HEAD_Y","HEAD_Z","PELVIS_X","PELVIS_Y","PELVIS_Z"];  discarded_time = 20; look_behind_pcent = 10; look_ahead_pcent = 40; listening_time = 8; time_const_lowpass_filter_estimand_pos = 0.1
 # rows_to_skip_estimand = list(range(0, 9))
 # time_step = 0.01
@@ -72,8 +72,8 @@ if is_use_baseline:
 
     df_baseline       = pd.read_csv(file_path_baseline)
     baseline_pos_loop = np.array(df_baseline[col_names_pos_baseline])
-    # ref_frame_baseline_points = extract_points_from_df(df_baseline, col_names_ref_frame_baseline_points)  # TODO edit point. path B
-    ref_frame_baseline_points = ref_frame_estimand_points.copy()                                            # TODO edit point. path A
+    ref_frame_baseline_points = extract_points_from_df(df_baseline, col_names_ref_frame_baseline_points)  # TODO edit point. path B
+    # ref_frame_baseline_points = ref_frame_estimand_points.copy()                                            # TODO edit point. path A
 else:
     baseline_pos_loop = None
     ref_frame_estimand_points = []

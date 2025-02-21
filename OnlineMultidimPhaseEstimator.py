@@ -209,9 +209,9 @@ class OnlineMultidimPhaseEstimator:
         rotated_loop = self.latest_pos_loop[:, 0:3] @ rotat_matrix_global_to_ego_estimand
 
         # TODO edit point. path A: comment next three lines. path B: uncoment
-        # x_axis_baseline, y_axis_baseline, z_axis_baseline = calculate_axes(self.ref_frame_baseline_points)
-        # rotat_matrix_global_to_ego_baseline = np.vstack([x_axis_baseline, y_axis_baseline, z_axis_baseline]).T
-        # self.baseline_pos_loop =  self.baseline_pos_loop[:, 0:3] @ rotat_matrix_global_to_ego_baseline
+        x_axis_baseline, y_axis_baseline, z_axis_baseline = calculate_axes(self.ref_frame_baseline_points)
+        rotat_matrix_global_to_ego_baseline = np.vstack([x_axis_baseline, y_axis_baseline, z_axis_baseline]).T
+        self.baseline_pos_loop =  self.baseline_pos_loop[:, 0:3] @ rotat_matrix_global_to_ego_baseline
 
         centroid = np.mean(rotated_loop, axis=0)
         rotated_centered_loop = rotated_loop - centroid
