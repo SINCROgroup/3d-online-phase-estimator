@@ -70,30 +70,24 @@ if is_use_baseline:
     ref_frame_estimand_points.append( np.array(df_estimand[col_names_ref_frame_estimand_point_2].iloc[first_idx_without_na]) )
     ref_frame_estimand_points.append( np.array(df_estimand[col_names_ref_frame_estimand_point_3].iloc[first_idx_without_na]) )
 
-# Filter input
-if time_const_lowpass_filter_estimand_pos > 0:
-    low_pass_filter_estimand = LowPassFilter(estimand_pos_signal[0, :], time_signal[1] - time_signal[0], time_const=time_const_lowpass_filter_estimand_pos)
-    for i_t in range(1, len(estimand_pos_signal)):
-        low_pass_filter_estimand.change_time_step(float(time_signal[i_t] - time_signal[i_t-1]))
-        estimand_pos_signal[i_t, :] = low_pass_filter_estimand.update_state(estimand_pos_signal[i_t, :])
-
 
 # Online estimator
 # ------------------------------------------------
 n_dims_estimand_pos = estimand_pos_signal.shape[1]
 n_time_instants     = estimand_pos_signal.shape[0]
 phase_estimator = OnlineMultidimPhaseEstimator(
-    n_dims_estimand_pos            = n_dims_estimand_pos,
-    listening_time                 = listening_time,
-    discarded_time                 = discarded_time,
-    min_duration_first_quasiperiod = min_duration_first_quasiperiod,
-    look_behind_pcent              = look_behind_pcent,
-    look_ahead_pcent               = look_ahead_pcent,
-    time_constant_lowpass_filter   = time_const_lowpass_filter_phase,
-    is_use_baseline                = is_use_baseline,
-    baseline_pos_loop              = baseline_pos_loop,
-    time_step_baseline             = time_step_baseline,
-    ref_frame_points              = ref_frame_estimand_points
+    n_dims_estimand_pos             = n_dims_estimand_pos,
+    listening_time                  = listening_time,
+    discarded_time                  = discarded_time,
+    min_duration_first_quasiperiod  = min_duration_first_quasiperiod,
+    look_behind_pcent               = look_behind_pcent,
+    look_ahead_pcent                = look_ahead_pcent,
+    time_const_lowpass_filter_pos = time_const_lowpass_filter_estimand_pos,
+    time_const_lowpass_filter_phase = time_const_lowpass_filter_phase,
+    is_use_baseline                 = is_use_baseline,
+    baseline_pos_loop               = baseline_pos_loop,
+    time_step_baseline              = time_step_baseline,
+    ref_frame_points                = ref_frame_estimand_points
 )
 phase_estimand_online = np.full(n_time_instants, None)
 for i_t in range(n_time_instants - 1):
@@ -102,8 +96,19 @@ for i_t in range(n_time_instants - 1):
 
 # Offline estimator
 # ------------------------------------------------
-means_estimand_pos = np.mean(estimand_pos_signal, axis=0)  # TODO make this a function or class
-estimand_pos_centered = estimand_pos_signal - means_estimand_pos
+# Filter input
+if not time_const_lowpass_filter_estimand_pos in {None, 0, -1}:
+    estimand_pos_signal_filtered = np.full_like(estimand_pos_signal, np.nan)
+    estimand_pos_signal_filtered[0, :] = estimand_pos_signal[0, :]
+    low_pass_filter_estimand = LowPassFilter(estimand_pos_signal[0, :], time_signal[1] - time_signal[0], time_const=time_const_lowpass_filter_estimand_pos)
+    for i_t in range(1, len(estimand_pos_signal)):
+        low_pass_filter_estimand.change_time_step(float(time_signal[i_t] - time_signal[i_t-1]))
+        estimand_pos_signal_filtered[i_t, :] = low_pass_filter_estimand.update_state(estimand_pos_signal[i_t, :])
+else:
+    estimand_pos_signal_filtered = estimand_pos_signal.copy()
+
+means_estimand_pos = np.mean(estimand_pos_signal_filtered, axis=0)  # TODO make this a function or class
+estimand_pos_centered = estimand_pos_signal_filtered - means_estimand_pos
 pca_model = PCA(n_components=1)
 pca_model.fit(estimand_pos_centered)
 principal_components = pca_model.transform(estimand_pos_centered)

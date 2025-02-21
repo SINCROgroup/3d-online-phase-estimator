@@ -2,7 +2,7 @@ import warnings
 import numpy as np
 from scipy.signal import detrend, find_peaks
 
-from LowPassFilters import LowPassFilterPhase
+from LowPassFilters import LowPassFilter, LowPassFilterPhase
 
 
 ##################################################
@@ -13,29 +13,31 @@ class OnlineMultidimPhaseEstimator:
     def __init__(self,
                  n_dims_estimand_pos: int,
                  listening_time,
-                 discarded_time                 = 0,
-                 min_duration_first_quasiperiod = 1,
-                 look_behind_pcent              = 0,
-                 look_ahead_pcent               = 10,
-                 time_constant_lowpass_filter   = None,
-                 is_use_baseline                = False,
-                 baseline_pos_loop              = None,
-                 time_step_baseline             = 0.01,
-                 ref_frame_points               = None):
+                 discarded_time                  = 0,
+                 min_duration_first_quasiperiod  = 1,
+                 look_behind_pcent               = 0,
+                 look_ahead_pcent                = 10,
+                 time_const_lowpass_filter_phase = None,
+                 time_const_lowpass_filter_pos   = None,
+                 is_use_baseline                 = False,
+                 baseline_pos_loop               = None,
+                 time_step_baseline              = 0.01,
+                 ref_frame_points                = None):
 
         self.is_first_loop_estimated = False
         assert look_ahead_pcent + look_behind_pcent <= 100, "look_ahead_pcent + look_behind_pcent must not exceed 100"
 
         # Initialization from arguments
-        self.n_dims                       = n_dims_estimand_pos
-        self.discarded_time               = discarded_time       # [s] discarded at the beginning before estimation
-        self.listening_time               = listening_time       # [s] waits this time before estimating first loop must contain 2 quasiperiods
-        self.look_ahead_pcent             = look_ahead_pcent     # % of last completed loop before last nearest point on which estimate the new phase
-        self.look_behind_pcent            = look_behind_pcent    # % of last completed loop after last nearest point on which estimate the new phase
-        self.time_constant_lowpass_filter = time_constant_lowpass_filter
-        self.is_use_baseline              = is_use_baseline
-        self.min_duration_quasiperiod     = min_duration_first_quasiperiod # [s]
-        self.time_step_baseline           = time_step_baseline
+        self.n_dims                          = n_dims_estimand_pos
+        self.discarded_time                  = discarded_time       # [s] discarded at the beginning before estimation
+        self.listening_time                  = listening_time       # [s] waits this time before estimating first loop must contain 2 quasiperiods
+        self.look_ahead_pcent                = look_ahead_pcent     # % of last completed loop before last nearest point on which estimate the new phase
+        self.look_behind_pcent               = look_behind_pcent    # % of last completed loop after last nearest point on which estimate the new phase
+        self.time_const_lowpass_filter_phase = time_const_lowpass_filter_phase
+        self.time_const_lowpass_filter_pos   = time_const_lowpass_filter_pos
+        self.is_use_baseline                 = is_use_baseline
+        self.min_duration_quasiperiod        = min_duration_first_quasiperiod # [s]
+        self.time_step_baseline              = time_step_baseline
 
         if is_use_baseline:
             assert n_dims_estimand_pos == 3,      "Baseline mode can be used only with n_dim = 3"
@@ -44,6 +46,13 @@ class OnlineMultidimPhaseEstimator:
 
             self.baseline_pos_loop = baseline_pos_loop.copy()
             self.ref_frame_points  = ref_frame_points.copy()
+
+        if time_const_lowpass_filter_phase in {None, 0, -1}:
+            self.is_use_lowpass_filter_phase = False
+        else:  self.is_use_lowpass_filter_phase = True
+        if time_const_lowpass_filter_pos in {None, 0, -1}:
+            self.is_use_lowpass_filter_pos = False
+        else:  self.is_use_lowpass_filter_pos = True
 
         # Attributes not tunable by caller
         self.phase_jump_for_loop_detection = np.pi
@@ -64,10 +73,18 @@ class OnlineMultidimPhaseEstimator:
 
     def update_pos_vel(self, curr_pos) -> None:
         self.pos_signal.append(curr_pos)
-        if len(self.pos_signal) >= 2:
+        if len(self.pos_signal) < 2:  # first instant
+            if self.is_use_lowpass_filter_pos:
+                self.lowpass_filter_pos = LowPassFilter(init_state=curr_pos,
+                                                    time_step=0,
+                                                    time_const=self.time_const_lowpass_filter_pos,)        
+            self.vel_signal.append(np.zeros(self.n_dims))
+        else:
             curr_step_time = self.local_time_signal[-1] - self.local_time_signal[-2]
+            if self.is_use_lowpass_filter_pos:
+                self.lowpass_filter_pos.change_time_step(curr_step_time)
+                self.pos_signal[-1] = self.lowpass_filter_pos.update_state(self.pos_signal[-1])
             self.vel_signal.append((self.pos_signal[-1] - self.pos_signal[-2]) / curr_step_time)
-        else:                          self.vel_signal.append(np.zeros(self.n_dims))
 
     def get_kinematics(self, idx:int) -> np.ndarray:
         return np.concatenate((self.pos_signal[idx], self.vel_signal[idx]))
@@ -127,10 +144,11 @@ class OnlineMultidimPhaseEstimator:
                     # Estimate phases between first loop and current time
                     idx_first_instant_of_second_loop = len(self.latest_pos_loop)
                     idx_prev_instant = len(self.pos_signal) - 2
-                    self.lowpass_filter_phase = LowPassFilterPhase(init_state=self.local_phase_signal[-1],
-                                                                 time_step=self.local_time_signal[idx_first_instant_of_second_loop] - self.local_time_signal[idx_first_instant_of_second_loop-1],
-                                                                 time_const=self.time_constant_lowpass_filter,
-                                                                 wrap_interv="0_to_2pi")
+                    if self.is_use_lowpass_filter_phase:
+                        self.lowpass_filter_phase = LowPassFilterPhase(init_state=self.local_phase_signal[-1],
+                                                                       time_step=self.local_time_signal[idx_first_instant_of_second_loop] - self.local_time_signal[idx_first_instant_of_second_loop-1],
+                                                                       time_const=self.time_const_lowpass_filter_phase,
+                                                                       wrap_interv="0_to_2pi")
                     for idx_scanning in range(idx_first_instant_of_second_loop, idx_prev_instant+1):   # recall: range excludes end point
                         curr_time_step = self.local_time_signal[idx_scanning] - self.local_time_signal[idx_scanning-1]
                         self.compute_phase(self.get_kinematics(idx_scanning), curr_time_step)
@@ -177,7 +195,7 @@ class OnlineMultidimPhaseEstimator:
 
         self.idx_curr_phase_in_latest_loop = idxs_loop_for_search[idx_min_distance]
         self.local_phase_signal.append((2 * np.pi * self.idx_curr_phase_in_latest_loop) / len_latest_loop)
-        if not self.time_constant_lowpass_filter in {None, 0, -1}:
+        if self.is_use_lowpass_filter_phase:
             self.lowpass_filter_phase.change_time_step(curr_time_step)
             self.local_phase_signal[-1] = self.lowpass_filter_phase.update_state(self.local_phase_signal[-1])
         self.global_phase_signal.append(np.mod(self.local_phase_signal[-1] + self.phase_offset, 2 * np.pi))
