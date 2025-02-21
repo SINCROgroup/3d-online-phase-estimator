@@ -122,8 +122,6 @@ phase_estimand_offline += initial_phase_estimand_online - initial_phase_estimand
 
 phase_estimand_offline = np.mod(phase_estimand_offline, 2 * np.pi)
 
-# TODO we should also compute and plot a phase passed through a first order filter (1. unwrap, 2. filter, 3. wrap)
-
 
 # Figure
 # ------------------------------------------------
