@@ -3,7 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from wrap_functions import wrap_to_2pi
-from OnlineMultidimPhaseEstimator_v2 import OnlineMultidimPhaseEstimator_v2
+from RecursiveOnlinePhaseEstimator import RecursiveOnlinePhaseEstimator
 from compute_phase_via_pca_hilbert import compute_phase_via_pca_hilbert
 from Phase_estimator_pca_online import Phase_estimator_pca_online
 import csv
@@ -74,7 +74,7 @@ else:
 # ------------------------------------------------
 n_dims_estimand_pos = estimand_pos_signal.shape[1]
 n_time_instants     = estimand_pos_signal.shape[0]
-phase_estimator = OnlineMultidimPhaseEstimator_v2(
+phase_estimator = RecursiveOnlinePhaseEstimator(
     n_dims_estimand_pos             = n_dims_estimand_pos,
     listening_time                  = listening_time,
     discarded_time                  = discarded_time,
