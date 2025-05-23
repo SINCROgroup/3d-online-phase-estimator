@@ -65,7 +65,7 @@ for i, shape in enumerate(shapes):
             time_step_baseline              = time_step_baseline,
             ref_frame_estimand_points       = ref_frame_estimand_points,
             ref_frame_baseline_points       = ref_frame_baseline_points,
-            is_violated_assumption_two      = True,
+            is_use_elapsed_time= True,
         )
         phase_estimand_online = np.full(n_time_instants, None)
         for i_t in range(n_time_instants - 1):

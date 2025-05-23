@@ -24,7 +24,7 @@ class OnlineMultidimPhaseEstimator_v2:
                  time_step_baseline              = 0.01,
                  ref_frame_estimand_points       = None,
                  ref_frame_baseline_points       = None,
-                 is_violated_assumption_two      = False):
+                 is_use_elapsed_time             = False):
 
         self.is_first_loop_estimated = False
         assert look_ahead_pcent + look_behind_pcent <= 100, "look_ahead_pcent + look_behind_pcent must not exceed 100"
@@ -40,7 +40,7 @@ class OnlineMultidimPhaseEstimator_v2:
         self.is_use_baseline                 = is_use_baseline
         self.min_duration_quasiperiod        = min_duration_first_quasiperiod # [s]
         self.time_step_baseline              = time_step_baseline
-        self.is_violated_assumption_two      = is_violated_assumption_two 
+        self.is_violated_assumption_two      = is_use_elapsed_time
 
         if is_use_baseline:
             assert n_dims_estimand_pos == 3,      "Baseline mode can be used only with n_dim = 3"
@@ -168,6 +168,8 @@ class OnlineMultidimPhaseEstimator_v2:
                 self.new_loop.append(self.get_kinematics(-1))
                 return self.global_phase_signal[-1]
 
+            case _:  raise ValueError(f"No match found for value: {self.active_mode}")
+
 
     def possibly_update_latest_loop(self, curr_time, idx):
             if self.local_phase_signal[-1] - self.local_phase_signal[-2] < - self.phase_jump_for_loop_detection:   # a quasiperiodicity window ended
@@ -195,12 +197,12 @@ class OnlineMultidimPhaseEstimator_v2:
             loop_for_search = self.latest_pos_loop[idxs_loop_for_search]
         if self.is_violated_assumption_two:
             idx_min_distance = compute_idx_min_distance_time(pos_signal = loop_for_search[:, 0:self.n_dims].copy(),
-                                                        vel_signal = loop_for_search[:, self.n_dims:].copy(),
-                                                        curr_pos   = curr_kinematics[0:self.n_dims],
-                                                        curr_vel   = curr_kinematics[self.n_dims:],
-                                                        curr_time = idx-self.loop_end_time,
-                                                        time_vec = idxs_loop_for_search,
-                                                        len_loop = len(self.latest_pos_loop))
+                                                             vel_signal = loop_for_search[:, self.n_dims:].copy(),
+                                                             curr_pos   = curr_kinematics[0:self.n_dims],
+                                                             curr_vel   = curr_kinematics[self.n_dims:],
+                                                             curr_idx=idx - self.loop_end_time,
+                                                             idxs_vec= idxs_loop_for_search,
+                                                             len_latest_loop= len_latest_loop)
         else:
             idx_min_distance = compute_idx_min_distance(pos_signal = loop_for_search[:, 0:self.n_dims].copy(),
                                                     vel_signal = loop_for_search[:, self.n_dims:].copy(),
@@ -307,16 +309,16 @@ def compute_idx_min_distance(pos_signal, vel_signal, curr_pos, curr_vel) -> int:
     distances_vel = distances_vel / max(distances_vel, default=1)
     return np.argmin(distances_pos + distances_vel)
 
-def compute_idx_min_distance_time(pos_signal, vel_signal, curr_pos, curr_vel,curr_time, time_vec, len_loop) -> int:
+def compute_idx_min_distance_time(pos_signal, vel_signal, curr_pos, curr_vel, curr_idx, idxs_vec, len_latest_loop) -> int:
     distances_pos = np.sqrt(np.sum((pos_signal - curr_pos) ** 2, axis=1))
     distances_vel = np.sqrt(np.sum((vel_signal - curr_vel) ** 2, axis=1))
     distances_pos = distances_pos / max(distances_pos, default=1)  
     distances_vel = distances_vel / max(distances_vel, default=1)
-    dis_1 = np.abs(time_vec - (curr_time-1))
-    dis_2 = np.abs((curr_time-1)-len_loop-time_vec)
-    distances = np.minimum(dis_1, dis_2)
-    distances = distances/ max(distances, default=1)
-    return np.argmin(distances_pos+ distances_vel + distances)
+    distances_idx_no_shift = np.abs(idxs_vec - (curr_idx - 1))
+    distances_idx_shift = np.abs(idxs_vec + len_latest_loop - (curr_idx - 1))
+    distances_idx = np.minimum(distances_idx_no_shift, distances_idx_shift)
+    distances_idx = distances_idx/ max(distances_idx, default=1)
+    return np.argmin(distances_pos + distances_vel + distances_idx)
 
 
 def calculate_axes(points):
