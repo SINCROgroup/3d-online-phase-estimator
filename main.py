@@ -7,54 +7,29 @@ from RecursiveOnlinePhaseEstimator import RecursiveOnlinePhaseEstimator
 from compute_phase_via_pca_hilbert import compute_phase_via_pca_hilbert
 
 
-# Parameters
+# Default parameters
 # ------------------------------------------------
-discarded_time                 = 1      # [s] all time between start and discarded_time (excluded) is discarded
-min_duration_first_quasiperiod = 0      # [s]
-listening_time                 = 10     # [s] waits this time before estimating first loop must contain 2 quasiperiods
-look_behind_pcent              = 5      # % of last completed loop before last nearest point on which estimate the new phase
-look_ahead_pcent               = 15     # % of last completed loop after last nearest point on which estimate the new phase
-time_const_lowpass_filter_phase   = 0.1    # [s]. Use None to disable. Must be larger than time step
-is_use_baseline                = True  # True: tethered mode; False: untethered mode
+discarded_time                  = 1      # [s] all time between start and discarded_time (excluded) is discarded
+# listening_time set below               # [s] waits this time before estimating first loop must contain 2 pseudoperiods
+min_duration_first_pseudoperiod = 0      # [s]
+
+look_behind_pcent = 5      # % of last completed loop before last nearest point on which estimate the new phase
+look_ahead_pcent  = 15     # % of last completed loop after last nearest point on which estimate the new phase
+
+is_use_baseline = False  # True: tethered mode; False: untethered mode
+
+time_const_lowpass_filter_phase        = 0.1    # [s]. Use None to disable. Must be larger than time step
 time_const_lowpass_filter_estimand_pos = 0.01
 
-file_path_estimand  = r"data\san_giovanni_2024-10-10\spiral_mc_1.csv"
-# file_path_estimand  = r"data\san_giovanni_2024-10-10\clockwise_and_anticlockwise_circle_mc_1.csv"; listening_time = 15
-# file_path_estimand  = r"data\san_giovanni_2024-10-10\macarena_mc_2.csv"; listening_time = 15
-rows_to_skip_estimand = [0, 1, 2] + list(range(4, 40))
-col_names_pos_estimand = ['TX.3', 'TY.3', 'TZ.3']
-time_step           = 0.01  # [s]
-is_use_baseline = True
-time_step_baseline  = 0.01
-# file_path_baseline  = r"data\san_giovanni_2024-10-10\spiral_ref.csv"       # TODO edit point. path A
-file_path_baseline  = r"data\san_giovanni_2024-10-10\spiral_baseline.csv"    # TODO edit point. path B
-col_names_pos_baseline = ['x', 'y', 'z']
-col_names_ref_frame_estimand_points = [['TX', 'TY', 'TZ'], ['TX.2', 'TY.2', 'TZ.2'], ['TX.1', 'TY.1', 'TZ.1']]        # belly, # right chest, # left chest
-col_names_ref_frame_baseline_points = [['p1_x','p1_y','p1_z'],['p2_x','p2_y','p2_z'],['p3_x','p3_y','p3_z']]
 
-# file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX101_pelvic_balance_good.csv"; col_names_pos_estimand = ["HIP_R_X","HIP_R_Y","HIP_R_Z","ILIAC_R_X","ILIAC_R_Y","ILIAC_R_Z","ILIAC_L_X","ILIAC_L_Y","ILIAC_L_Z","HIP_L_X","HIP_L_Y","HIP_L_Z"];  look_behind_pcent = 5; look_ahead_pcent = 15; listening_time = 15; time_const_lowpass_filter_estimand_pos = 0.1
-# file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX102_pelvic_balance_bad.csv"; col_names_pos_estimand  = ["HIP_R_X","HIP_R_Y","HIP_R_Z","ILIAC_R_X","ILIAC_R_Y","ILIAC_R_Z","ILIAC_L_X","ILIAC_L_Y","ILIAC_L_Z","HIP_L_X","HIP_L_Y","HIP_L_Z"]; look_behind_pcent = 2; look_ahead_pcent = 15; listening_time = 30; time_const_lowpass_filter_estimand_pos = 0.1
-# file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX201_superman_good.csv"; col_names_pos_estimand = ["HAN_R_X","HAN_R_Y","HAN_R_Z", "HAN_L_X", "HAN_L_Y", "HAN_L_Z","ANK_R_X","ANK_R_Y","ANK_R_Z","ANK_L_X","ANK_L_Y","ANK_L_Z"];  look_behind_pcent = 5; look_ahead_pcent = 15; listening_time = 45; time_const_lowpass_filter_estimand_pos = 0.1
-# file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX202_superman_bad.csv"; col_names_pos_estimand  = ["HAN_R_X","HAN_R_Y","HAN_R_Z", "HAN_L_X", "HAN_L_Y", "HAN_L_Z","ANK_R_X","ANK_R_Y","ANK_R_Z","ANK_L_X","ANK_L_Y","ANK_L_Z"];  look_behind_pcent = 5; look_ahead_pcent = 15; listening_time = 25;  time_const_lowpass_filter_estimand_pos = 0.1
-# file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX301_bridge_good.csv"; col_names_pos_estimand = ["HIP_R_X","HIP_R_Y","HIP_R_Z","KNE_R_X","KNE_R_Y","KNE_R_Z","HIP_L_X","HIP_L_Y","HIP_L_Z","KNE_L_X","KNE_L_Y","KNE_L_Z"];  look_behind_pcent = 5; look_ahead_pcent = 30; listening_time = 30; time_const_lowpass_filter_estimand_pos = 0.1
-# file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX302_bridge_bad.csv"; col_names_pos_estimand = ["HIP_R_X","HIP_R_Y","HIP_R_Z","KNE_R_X","KNE_R_Y","KNE_R_Z","HIP_L_X","HIP_L_Y","HIP_L_Z","KNE_L_X","KNE_L_Y","KNE_L_Z"];  look_behind_pcent = 2; look_ahead_pcent = 15; listening_time = 15; time_const_lowpass_filter_estimand_pos = 0.1
-# file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX401_plank_good.csv"; col_names_pos_esti mand = ["HEAD_X","HEAD_Y","HEAD_Z","PELVIS_X","PELVIS_Y","PELVIS_Z"];  look_behind_pcent = 5; look_ahead_pcent = 15; listening_time = 22; time_const_lowpass_filter_estimand_pos = 0.1
-# file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX402_plank_bad.csv"; col_names_pos_estimand  = ["HEAD_X","HEAD_Y","HEAD_Z","PELVIS_X","PELVIS_Y","PELVIS_Z"];  discarded_time = 20; look_behind_pcent = 10; look_ahead_pcent = 40; listening_time = 8; time_const_lowpass_filter_estimand_pos = 0.1
-# rows_to_skip_estimand = list(range(0, 9))
-# time_step = 0.01
-# is_use_baseline = False;  time_step_baseline = None
+# Loaded parameters
+#-------------------------------------------------
+# Can overwrite default parameters
 
-# file_path_estimand = r"data\dfki_mocap_excerises_2025-03-25\exercise_1\positions.csv"
-# col_names_pos_estimand  = ["X22", "Y22", "Z22", "X26", "Y26", "Z26"] # Rshoulder and Lshoulder
-# discarded_time = 5; look_behind_pcent = 10; look_ahead_pcent = 40; listening_time = 20; time_const_lowpass_filter_estimand_pos = 0.1
-# rows_to_skip_estimand = list(range(0, 4))
-# time_step = 1/30
-# is_use_baseline = False;  time_step_baseline = None
-
-# file_path_estimand = r"data\cyens_mocap_2025-04-23\csv\Ex2-Sub1-0_worldpos.csv"; col_names_pos_estimand = ["Hips.X","Hips.Y","Hips.Z","RightShoulder.X","RightShoulder.Y","RightShoulder.Z","LeftShoulder.X","LeftShoulder.Y","LeftShoulder.Z","RightHand.X","RightHand.Y","RightHand.Z","LeftHand.X","LeftHand.Y","LeftHand.Z"];  look_behind_pcent = 5; look_ahead_pcent = 15; listening_time = 10; time_const_lowpass_filter_estimand_pos = 0.1
-# rows_to_skip_estimand = list(range(0, 0))
-# is_use_baseline = False
-# time_step = 0.016667
+from setup_params.san_giovanni_2024_10_10 import *
+# from setup_params.montpellier_2025_01_17 import *
+# from setup_params.dfki_2025_03_25 import *
+# from setup_params.cyens_2025_04_23 import *
 
 
 # Load data
@@ -100,7 +75,7 @@ phase_estimator = RecursiveOnlinePhaseEstimator(
     n_dims_estimand_pos             = n_dims_estimand_pos,
     listening_time                  = listening_time,
     discarded_time                  = discarded_time,
-    min_duration_first_quasiperiod  = min_duration_first_quasiperiod,
+    min_duration_first_pseudoperiod = min_duration_first_pseudoperiod,
     look_behind_pcent               = look_behind_pcent,
     look_ahead_pcent                = look_ahead_pcent,
     time_const_lowpass_filter_pos = time_const_lowpass_filter_estimand_pos,

@@ -55,7 +55,7 @@ for i, shape in enumerate(shapes):
             n_dims_estimand_pos             = n_dims_estimand_pos,
             listening_time                  = listening_time,
             discarded_time                  = discarded_time,
-            min_duration_first_quasiperiod  = min_duration_first_quasiperiod,
+            min_duration_first_pseudoperiod= min_duration_first_quasiperiod,
             look_behind_pcent               = look_behind_pcent,
             look_ahead_pcent                = look_ahead_pcent,
             time_const_lowpass_filter_pos = time_const_lowpass_filter_estimand_pos,

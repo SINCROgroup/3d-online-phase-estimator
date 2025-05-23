@@ -14,7 +14,7 @@ class RecursiveOnlinePhaseEstimator:
                  n_dims_estimand_pos: int,
                  listening_time,
                  discarded_time                  = 0,
-                 min_duration_first_quasiperiod  = 1,
+                 min_duration_first_pseudoperiod  = 1,
                  look_behind_pcent               = 0,
                  look_ahead_pcent                = 10,
                  time_const_lowpass_filter_phase = None,
@@ -32,13 +32,13 @@ class RecursiveOnlinePhaseEstimator:
         # Initialization from arguments
         self.n_dims                          = n_dims_estimand_pos
         self.discarded_time                  = discarded_time       # [s] discarded at the beginning before estimation
-        self.listening_time                  = listening_time       # [s] waits this time before estimating first loop must contain 2 quasiperiods
+        self.listening_time                  = listening_time       # [s] waits this time before estimating first loop must contain 2 pseudoperiods
         self.look_ahead_pcent                = look_ahead_pcent     # % of last completed loop before last nearest point on which estimate the new phase
         self.look_behind_pcent               = look_behind_pcent    # % of last completed loop after last nearest point on which estimate the new phase
         self.time_const_lowpass_filter_phase = time_const_lowpass_filter_phase
         self.time_const_lowpass_filter_pos   = time_const_lowpass_filter_pos
         self.is_use_baseline                 = is_use_baseline
-        self.min_duration_quasiperiod        = min_duration_first_quasiperiod # [s]
+        self.min_duration_pseudoperiod        = min_duration_first_pseudoperiod # [s]
         self.time_step_baseline              = time_step_baseline
         self.is_use_elapsed_time             = is_use_elapsed_time   # True: also uses elapsed time to determine period completion
 
@@ -120,7 +120,7 @@ class RecursiveOnlinePhaseEstimator:
         if self.active_mode == "listening" and self.local_time_signal[-1] > self.discarded_time + self.listening_time:
             self.active_mode = "estimating"
             # self.idx_time_start_estimating = len(self.local_time_signal)
- 
+
         # Update estimator according to active mode
         match self.active_mode:
             case "sleeping":
@@ -138,7 +138,7 @@ class RecursiveOnlinePhaseEstimator:
                         pos_signal=self.pos_signal,
                         vel_signal=self.vel_signal,
                         local_time_vec=self.local_time_signal,
-                        min_duration_quasiperiod=self.min_duration_quasiperiod)
+                        min_duration_pseudoperiod=self.min_duration_pseudoperiod)
                     self.update_look_ranges()
 
                     self.delimiter_time_instants.append(float(self.local_time_signal[self.idx_time_start_listening] + self.time_estimator_started))
@@ -148,7 +148,7 @@ class RecursiveOnlinePhaseEstimator:
                     self.is_first_loop_estimated = True
 
                     if self.is_use_baseline:  self.compute_phase_offset()
-    
+
                     # Compute phases in first loop
                     local_phases_first_loop  = np.linspace(0, 2 * np.pi, len(self.latest_loop))
                     global_phases_first_loop = np.mod(local_phases_first_loop + self.phase_offset, 2 * np.pi)
@@ -183,7 +183,7 @@ class RecursiveOnlinePhaseEstimator:
 
 
     def possibly_update_latest_loop(self, curr_external_time, curr_idx):
-            if self.local_phase_signal[-1] - self.local_phase_signal[-2] < - self.phase_jump_for_loop_detection:   # a quasiperiodicity window ended
+            if self.local_phase_signal[-1] - self.local_phase_signal[-2] < - self.phase_jump_for_loop_detection:   # a pseudoperiodicity window ended
                 self.delimiter_time_instants.append(float(curr_external_time))
                 self.delimiter_idxs.append(curr_idx)
                 self.latest_loop = np.vstack(self.new_loop)
@@ -228,7 +228,7 @@ class RecursiveOnlinePhaseEstimator:
             self.local_phase_signal[-1] = self.lowpass_filter_phase.update_state(self.local_phase_signal[-1])
         self.global_phase_signal.append(np.mod(self.local_phase_signal[-1] + self.phase_offset, 2 * np.pi))
 
-    
+
     def compute_phase_offset(self) -> None:
         # TODO edit point. path A: comment next five lines. path B: uncoment
         x_axis_baseline, y_axis_baseline, z_axis_baseline = calculate_axes(self.ref_frame_baseline_points)
@@ -245,7 +245,7 @@ class RecursiveOnlinePhaseEstimator:
         rotated_centered_loop = rotated_loop - centroid_estimand
 
         scale_factors = np.std(self.baseline_pos_loop, axis=0) / np.std(rotated_centered_loop, axis=0)
-        scale_factors[np.isnan(scale_factors)] = 1 
+        scale_factors[np.isnan(scale_factors)] = 1
         scaled_rotated_centered_loop = rotated_centered_loop * scale_factors
 
         curr_pos_ = scaled_rotated_centered_loop[0, :]
@@ -267,7 +267,7 @@ class RecursiveOnlinePhaseEstimator:
 threshold_acceptable_peaks_wrt_maximum_pcent = 40  # Acceptance range of autocorrelation peaks defined as a percentage of the maximum autocorrelation value.
 
 
-def compute_loop_with_autocorrelation(pos_signal, vel_signal, local_time_vec, min_duration_quasiperiod) -> np.ndarray:
+def compute_loop_with_autocorrelation(pos_signal, vel_signal, local_time_vec, min_duration_pseudoperiod) -> np.ndarray:
     n_dim = len(pos_signal[0])
     pos_signal_stacked = np.vstack(pos_signal)  # time flows vertically
     vel_signal_stacked = np.vstack(vel_signal)
@@ -279,7 +279,7 @@ def compute_loop_with_autocorrelation(pos_signal, vel_signal, local_time_vec, mi
         autocorr_vecs_per_dim[i] = compute_autocorr_vec(detrend(pos_signal_unstacked[i]))
     autocorr_vec_tot = np.sum(np.array(autocorr_vecs_per_dim), axis=0)
 
-    idx_min_length = np.argmax(np.array(local_time_vec) > min_duration_quasiperiod)  # argmax finds the first True
+    idx_min_length = np.argmax(np.array(local_time_vec) > min_duration_pseudoperiod)  # argmax finds the first True
     autocorr_vec_tot[:idx_min_length] = autocorr_vec_tot[idx_min_length]
 
     autocorr_vec_tot = autocorr_vec_tot / np.max(np.abs(autocorr_vec_tot))

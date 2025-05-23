@@ -1,0 +1,14 @@
+file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX101_pelvic_balance_good.csv"; col_names_pos_estimand = ["HIP_R_X","HIP_R_Y","HIP_R_Z","ILIAC_R_X","ILIAC_R_Y","ILIAC_R_Z","ILIAC_L_X","ILIAC_L_Y","ILIAC_L_Z","HIP_L_X","HIP_L_Y","HIP_L_Z"];  look_behind_pcent = 5; look_ahead_pcent = 15; listening_time = 15; time_const_lowpass_filter_estimand_pos = 0.1
+# file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX102_pelvic_balance_bad.csv"; col_names_pos_estimand  = ["HIP_R_X","HIP_R_Y","HIP_R_Z","ILIAC_R_X","ILIAC_R_Y","ILIAC_R_Z","ILIAC_L_X","ILIAC_L_Y","ILIAC_L_Z","HIP_L_X","HIP_L_Y","HIP_L_Z"]; look_behind_pcent = 2; look_ahead_pcent = 15; listening_time = 30; time_const_lowpass_filter_estimand_pos = 0.1
+# file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX201_superman_good.csv"; col_names_pos_estimand = ["HAN_R_X","HAN_R_Y","HAN_R_Z", "HAN_L_X", "HAN_L_Y", "HAN_L_Z","ANK_R_X","ANK_R_Y","ANK_R_Z","ANK_L_X","ANK_L_Y","ANK_L_Z"];  look_behind_pcent = 5; look_ahead_pcent = 15; listening_time = 45; time_const_lowpass_filter_estimand_pos = 0.1
+# file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX202_superman_bad.csv"; col_names_pos_estimand  = ["HAN_R_X","HAN_R_Y","HAN_R_Z", "HAN_L_X", "HAN_L_Y", "HAN_L_Z","ANK_R_X","ANK_R_Y","ANK_R_Z","ANK_L_X","ANK_L_Y","ANK_L_Z"];  look_behind_pcent = 5; look_ahead_pcent = 15; listening_time = 25;  time_const_lowpass_filter_estimand_pos = 0.1
+# file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX301_bridge_good.csv"; col_names_pos_estimand = ["HIP_R_X","HIP_R_Y","HIP_R_Z","KNE_R_X","KNE_R_Y","KNE_R_Z","HIP_L_X","HIP_L_Y","HIP_L_Z","KNE_L_X","KNE_L_Y","KNE_L_Z"];  look_behind_pcent = 5; look_ahead_pcent = 30; listening_time = 30; time_const_lowpass_filter_estimand_pos = 0.1
+# file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX302_bridge_bad.csv"; col_names_pos_estimand = ["HIP_R_X","HIP_R_Y","HIP_R_Z","KNE_R_X","KNE_R_Y","KNE_R_Z","HIP_L_X","HIP_L_Y","HIP_L_Z","KNE_L_X","KNE_L_Y","KNE_L_Z"];  look_behind_pcent = 2; look_ahead_pcent = 15; listening_time = 15; time_const_lowpass_filter_estimand_pos = 0.1
+# file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX401_plank_good.csv"; col_names_pos_esti mand = ["HEAD_X","HEAD_Y","HEAD_Z","PELVIS_X","PELVIS_Y","PELVIS_Z"];  look_behind_pcent = 5; look_ahead_pcent = 15; listening_time = 22; time_const_lowpass_filter_estimand_pos = 0.1
+# file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX402_plank_bad.csv"; col_names_pos_estimand  = ["HEAD_X","HEAD_Y","HEAD_Z","PELVIS_X","PELVIS_Y","PELVIS_Z"];  discarded_time = 20; look_behind_pcent = 10; look_ahead_pcent = 40; listening_time = 8; time_const_lowpass_filter_estimand_pos = 0.1
+
+rows_to_skip_estimand = list(range(0, 9))
+time_step             = 0.01
+
+is_use_baseline = False;
+time_step_baseline = None
