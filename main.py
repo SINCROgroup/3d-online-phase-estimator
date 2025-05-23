@@ -10,7 +10,7 @@ from compute_phase_via_pca_hilbert import compute_phase_via_pca_hilbert
 # Default parameters
 # ------------------------------------------------
 discarded_time                  = 1      # [s] all time between start and discarded_time (excluded) is discarded
-# listening_time set below               # [s] waits this time before estimating first loop must contain 2 pseudoperiods
+# "listening_time" set below               # [s] waits this time before estimating first loop must contain 2 pseudoperiods
 min_duration_first_pseudoperiod = 0      # [s]
 
 look_behind_pcent = 5      # % of last completed loop before last nearest point on which estimate the new phase
