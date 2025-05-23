@@ -40,7 +40,7 @@ class OnlineMultidimPhaseEstimator_v2:
         self.is_use_baseline                 = is_use_baseline
         self.min_duration_quasiperiod        = min_duration_first_quasiperiod # [s]
         self.time_step_baseline              = time_step_baseline
-        self.is_use_elapsed_time             = is_use_elapsed_time
+        self.is_use_elapsed_time             = is_use_elapsed_time   # True: also uses elapsed time to determine period completion
 
         if is_use_baseline:
             assert n_dims_estimand_pos == 3,      "Baseline mode can be used only with n_dim = 3"
@@ -65,10 +65,11 @@ class OnlineMultidimPhaseEstimator_v2:
         self.active_mode             = "sleeping"
         self.phase_offset            = 0
         self.loop_end_time           = 0
-        self.pos_signal              = []
+        self.pos_signal              = []  #                  [0=start_listening ...]
         self.vel_signal              = []
-        self.local_time_signal       = []
-        self.delimiter_time_instants = []
+        self.local_time_signal       = []  # [0=initial_time ... start_listening ...]
+        self.delimiter_time_instants = []  # framed in the external time
+        self.delimiter_idxs          = []  # index in which each loop start (relative to pos_signal)
         self.local_phase_signal      = []  # local:  without offset
         self.global_phase_signal     = []  # global: with offset
         self.new_loop                = []
@@ -80,8 +81,8 @@ class OnlineMultidimPhaseEstimator_v2:
         if len(self.pos_signal) < 2:  # first instant
             if self.is_use_lowpass_filter_pos:
                 self.lowpass_filter_pos = LowPassFilter(init_state=curr_pos,
-                                                    time_step=0,
-                                                    time_const=self.time_const_lowpass_filter_pos,)        
+                                                        time_step=0,
+                                                        time_const=self.time_const_lowpass_filter_pos,)
             self.vel_signal.append(np.zeros(self.n_dims))
         else:
             curr_step_time = self.local_time_signal[-1] - self.local_time_signal[-2]
@@ -90,20 +91,27 @@ class OnlineMultidimPhaseEstimator_v2:
                 self.pos_signal[-1] = self.lowpass_filter_pos.update_state(self.pos_signal[-1])
             self.vel_signal.append((self.pos_signal[-1] - self.pos_signal[-2]) / curr_step_time)
 
+
     def get_kinematics(self, idx:int) -> np.ndarray:
         return np.concatenate((self.pos_signal[idx], self.vel_signal[idx]))
 
 
     def update_look_ranges(self) -> None:
-        self.look_ahead_range  = int(len(self.latest_pos_loop) * self.look_ahead_pcent  / 100)
-        self.look_behind_range = int(len(self.latest_pos_loop) * self.look_behind_pcent / 100)
+        self.look_ahead_range  = int(len(self.latest_loop) * self.look_ahead_pcent / 100)
+        self.look_behind_range = int(len(self.latest_loop) * self.look_behind_pcent / 100)
 
 
-    # This is the main cycle perfomerd at each time instant
-    def update_estimator(self, curr_pos, curr_time) -> float:
+    # This is the main cycle performed at each time instant
+    def update_estimator(self, curr_pos, curr_external_time) -> float:
 
-        if not self.local_time_signal:  self.initial_time = curr_time  # initialize initial_time
-        self.local_time_signal.append(curr_time - self.initial_time)
+        # Time frames and vectors:
+        # external time:  0---E------->
+        # local time:         0---D--->
+        # pos/vel/phase:          0--->
+        #   E: estimator started; D: discarded time/listening starts
+
+        if not self.local_time_signal:  self.time_estimator_started = curr_external_time  # initialize initial_time
+        self.local_time_signal.append(curr_external_time - self.time_estimator_started)
 
         # Update active mode
         if self.active_mode == "sleeping" and self.local_time_signal[-1] >= self.discarded_time:
@@ -126,28 +134,29 @@ class OnlineMultidimPhaseEstimator_v2:
                 self.update_pos_vel(curr_pos)
 
                 if not self.is_first_loop_estimated:
-                    self.latest_pos_loop = compute_loop_with_autocorrelation(
-                        self,
+                    self.latest_loop = compute_loop_with_autocorrelation(
                         pos_signal=self.pos_signal,
                         vel_signal=self.vel_signal,
                         local_time_vec=self.local_time_signal,
                         min_duration_quasiperiod=self.min_duration_quasiperiod)
                     self.update_look_ranges()
 
-                    self.delimiter_time_instants.append(float(self.local_time_signal[self.idx_time_start_listening] + self.initial_time))
-                    self.delimiter_time_instants.append(float(self.local_time_signal[len(self.latest_pos_loop) + self.idx_time_start_listening] + self.initial_time))
+                    self.delimiter_time_instants.append(float(self.local_time_signal[self.idx_time_start_listening] + self.time_estimator_started))
+                    self.delimiter_idxs.append(0)
+                    self.delimiter_time_instants.append(float(self.local_time_signal[len(self.latest_loop) + self.idx_time_start_listening] + self.time_estimator_started))
+                    self.delimiter_idxs.append(len(self.latest_loop))
                     self.is_first_loop_estimated = True
 
                     if self.is_use_baseline:  self.compute_phase_offset()
     
                     # Compute phases in first loop
-                    local_phases_first_loop  = np.linspace(0, 2 * np.pi, len(self.latest_pos_loop))
+                    local_phases_first_loop  = np.linspace(0, 2 * np.pi, len(self.latest_loop))
                     global_phases_first_loop = np.mod(local_phases_first_loop + self.phase_offset, 2 * np.pi)
                     self.local_phase_signal  = self.local_phase_signal + local_phases_first_loop.tolist()
                     self.global_phase_signal = self.global_phase_signal + (global_phases_first_loop + self.phase_offset).tolist()
 
                     # Estimate phases between first loop and current time
-                    idx_first_instant_of_second_loop = len(self.latest_pos_loop)
+                    idx_first_instant_of_second_loop = len(self.latest_loop)
                     idx_prev_instant = len(self.pos_signal) - 2
                     if self.is_use_lowpass_filter_phase:
                         self.lowpass_filter_phase = LowPassFilterPhase(init_state=self.local_phase_signal[-1],
@@ -156,58 +165,62 @@ class OnlineMultidimPhaseEstimator_v2:
                                                                        wrap_interv="0_to_2pi")
                     for idx_scanning in range(idx_first_instant_of_second_loop, idx_prev_instant+1):   # recall: range excludes end point
                         curr_time_step = self.local_time_signal[idx_scanning] - self.local_time_signal[idx_scanning-1]
-                        self.compute_phase(self.get_kinematics(idx_scanning), curr_time_step, idx_scanning+1)
+                        scanning_time = self.local_time_signal[idx_scanning + self.idx_time_start_listening] + self.time_estimator_started
+                        self.compute_phase(self.get_kinematics(idx_scanning), curr_time_step, scanning_time)
                         if idx_scanning > idx_first_instant_of_second_loop:  # at first instant of second loop don't check, because new loop is already loaded and besides new_loop is empty
-                            self.possibly_update_latest_loop(self.local_time_signal[idx_scanning + self.idx_time_start_listening] + self.initial_time, idx_scanning+1)
+                            self.possibly_update_latest_loop(scanning_time, idx_scanning)
                         self.new_loop.append(self.get_kinematics(idx_scanning))
 
                 # Estimate phase at current time
+                curr_idx       = len(self.pos_signal)
                 curr_time_step = self.local_time_signal[-1] - self.local_time_signal[-2]
-                self.compute_phase(self.get_kinematics(-1), curr_time_step, len(self.pos_signal))
-                self.possibly_update_latest_loop(curr_time, len(self.pos_signal))
+                self.compute_phase(self.get_kinematics(-1), curr_time_step, curr_external_time)
+                self.possibly_update_latest_loop(curr_external_time, curr_idx)
                 self.new_loop.append(self.get_kinematics(-1))
                 return self.global_phase_signal[-1]
 
             case _:  raise ValueError(f"No match found for value: {self.active_mode}")
 
 
-    def possibly_update_latest_loop(self, curr_time, idx):
+    def possibly_update_latest_loop(self, curr_external_time, curr_idx):
             if self.local_phase_signal[-1] - self.local_phase_signal[-2] < - self.phase_jump_for_loop_detection:   # a quasiperiodicity window ended
-                self.delimiter_time_instants.append(float(curr_time))
-                self.latest_pos_loop = np.vstack(self.new_loop)
+                self.delimiter_time_instants.append(float(curr_external_time))
+                self.delimiter_idxs.append(curr_idx)
+                self.latest_loop = np.vstack(self.new_loop)
                 self.update_look_ranges()
-                self.loop_end_time = idx
                 self.new_loop = []         # reinitialize new_loop
                 self.idx_curr_phase_in_latest_loop = 0
 
 
-    def compute_phase(self, curr_kinematics, curr_time_step, idx):
-        len_latest_loop = len(self.latest_pos_loop)
+    def compute_phase(self, curr_kinematics, curr_time_step, curr_external_time):
+        len_latest_loop = len(self.latest_loop)
         if self.idx_curr_phase_in_latest_loop + self.look_ahead_range <= len_latest_loop:
             #   loop: [- - - - - - single part - - - - -]
             idxs_loop_for_search = np.arange( max(0, self.idx_curr_phase_in_latest_loop - self.look_behind_range),
                                               self.idx_curr_phase_in_latest_loop + self.look_ahead_range)
-            loop_for_search = self.latest_pos_loop[idxs_loop_for_search]
+            loop_for_search = self.latest_loop[idxs_loop_for_search]
         else:
             #   loop: [part_2 - - - - - - - - part_1]
             idxs_end_part_2 = self.idx_curr_phase_in_latest_loop + self.look_ahead_range - len_latest_loop
             idxs_part_1 = np.arange(max(idxs_end_part_2, self.idx_curr_phase_in_latest_loop - self.look_behind_range), len_latest_loop)
             idxs_part_2 = np.arange(0, idxs_end_part_2)
             idxs_loop_for_search = np.concatenate((idxs_part_1, idxs_part_2))
-            loop_for_search = self.latest_pos_loop[idxs_loop_for_search]
-        if self.is_use_elapsed_time:
-            idx_min_distance = compute_idx_min_distance_time(pos_signal = loop_for_search[:, 0:self.n_dims].copy(),
-                                                             vel_signal = loop_for_search[:, self.n_dims:].copy(),
-                                                             curr_pos   = curr_kinematics[0:self.n_dims],
-                                                             curr_vel   = curr_kinematics[self.n_dims:],
-                                                             curr_idx=idx - self.loop_end_time,
-                                                             idxs_vec= idxs_loop_for_search,
-                                                             len_latest_loop= len_latest_loop)
-        else:
+            loop_for_search = self.latest_loop[idxs_loop_for_search]
+        if not self.is_use_elapsed_time:
             idx_min_distance = compute_idx_min_distance(pos_signal = loop_for_search[:, 0:self.n_dims].copy(),
-                                                    vel_signal = loop_for_search[:, self.n_dims:].copy(),
-                                                    curr_pos   = curr_kinematics[0:self.n_dims],
-                                                    curr_vel   = curr_kinematics[self.n_dims:])
+                                                        vel_signal = loop_for_search[:, self.n_dims:].copy(),
+                                                        curr_pos   = curr_kinematics[0:self.n_dims],
+                                                        curr_vel   = curr_kinematics[self.n_dims:])
+        else:
+            latest_loop_time = np.array(self.local_time_signal[self.delimiter_idxs[-2]:self.delimiter_idxs[-1]]) - self.local_time_signal[self.delimiter_idxs[-2]]
+            time_loop_for_search = latest_loop_time[idxs_loop_for_search]
+            idx_min_distance = compute_idx_min_distance_with_time(pos_signal           = loop_for_search[:, 0:self.n_dims].copy(),
+                                                                  vel_signal           = loop_for_search[:, self.n_dims:].copy(),
+                                                                  curr_pos             = curr_kinematics[0:self.n_dims],
+                                                                  curr_vel             = curr_kinematics[self.n_dims:],
+                                                                  curr_elapsed_time    = curr_external_time - self.delimiter_time_instants[-1],
+                                                                  elapsed_time_signal= time_loop_for_search,
+                                                                  duration_latest_loop = self.delimiter_time_instants[-1] - self.delimiter_time_instants[-2])
         self.idx_curr_phase_in_latest_loop = idxs_loop_for_search[idx_min_distance]
         self.local_phase_signal.append((2 * np.pi * self.idx_curr_phase_in_latest_loop) / len_latest_loop)
         if self.is_use_lowpass_filter_phase:
@@ -226,7 +239,7 @@ class OnlineMultidimPhaseEstimator_v2:
 
         x_axis_estimand, y_axis_estimand, z_axis_estimand = calculate_axes(self.ref_frame_estimand_points)
         rotat_matrix_global_to_ego_estimand = np.vstack([x_axis_estimand, y_axis_estimand, z_axis_estimand]).T
-        rotated_loop = self.latest_pos_loop[:, 0:3] @ rotat_matrix_global_to_ego_estimand
+        rotated_loop = self.latest_loop[:, 0:3] @ rotat_matrix_global_to_ego_estimand
 
         centroid_estimand = np.mean(rotated_loop, axis=0)
         rotated_centered_loop = rotated_loop - centroid_estimand
@@ -254,7 +267,7 @@ class OnlineMultidimPhaseEstimator_v2:
 threshold_acceptable_peaks_wrt_maximum_pcent = 40  # Acceptance range of autocorrelation peaks defined as a percentage of the maximum autocorrelation value.
 
 
-def compute_loop_with_autocorrelation(self, pos_signal, vel_signal, local_time_vec, min_duration_quasiperiod) -> np.ndarray:
+def compute_loop_with_autocorrelation(pos_signal, vel_signal, local_time_vec, min_duration_quasiperiod) -> np.ndarray:
     n_dim = len(pos_signal[0])
     pos_signal_stacked = np.vstack(pos_signal)  # time flows vertically
     vel_signal_stacked = np.vstack(vel_signal)
@@ -281,7 +294,6 @@ def compute_loop_with_autocorrelation(self, pos_signal, vel_signal, local_time_v
 
     pos_loop = pos_signal_stacked[idx_start_loop:idx_stop_loop, :]
     vel_loop = vel_signal_stacked[idx_start_loop:idx_stop_loop, :]
-    self.idx_end_loop = idx_stop_loop - 1
     return np.column_stack((pos_loop, vel_loop))
 
 
@@ -309,16 +321,16 @@ def compute_idx_min_distance(pos_signal, vel_signal, curr_pos, curr_vel) -> int:
     distances_vel = distances_vel / max(distances_vel, default=1)
     return np.argmin(distances_pos + distances_vel)
 
-def compute_idx_min_distance_time(pos_signal, vel_signal, curr_pos, curr_vel, curr_idx, idxs_vec, len_latest_loop) -> int:
+def compute_idx_min_distance_with_time(pos_signal, vel_signal, curr_pos, curr_vel, curr_elapsed_time, elapsed_time_signal, duration_latest_loop) -> int:
     distances_pos = np.sqrt(np.sum((pos_signal - curr_pos) ** 2, axis=1))
     distances_vel = np.sqrt(np.sum((vel_signal - curr_vel) ** 2, axis=1))
-    distances_pos = distances_pos / max(distances_pos, default=1)  
-    distances_vel = distances_vel / max(distances_vel, default=1)
-    distances_idx_no_shift = np.abs(idxs_vec - (curr_idx))
-    distances_idx_shift = np.abs(idxs_vec + len_latest_loop - (curr_idx))
-    distances_idx = np.minimum(distances_idx_no_shift, distances_idx_shift)
-    distances_idx = distances_idx/ max(distances_idx, default=1)
-    return np.argmin(distances_pos + distances_vel + distances_idx)
+    distances_time_no_shift = np.abs(elapsed_time_signal - curr_elapsed_time)
+    distances_time_shift    = np.abs(elapsed_time_signal + duration_latest_loop - curr_elapsed_time)
+    distances_time          = np.minimum(distances_time_no_shift, distances_time_shift)
+    distances_pos  = distances_pos  / max(distances_pos,  default=1)
+    distances_vel  = distances_vel  / max(distances_vel,  default=1)
+    distances_time = distances_time / max(distances_time, default=1)
+    return np.argmin(distances_pos + distances_vel + distances_time)
 
 
 def calculate_axes(points):
