@@ -40,7 +40,7 @@ class OnlineMultidimPhaseEstimator_v2:
         self.is_use_baseline                 = is_use_baseline
         self.min_duration_quasiperiod        = min_duration_first_quasiperiod # [s]
         self.time_step_baseline              = time_step_baseline
-        self.is_violated_assumption_two      = is_use_elapsed_time
+        self.is_use_elapsed_time             = is_use_elapsed_time
 
         if is_use_baseline:
             assert n_dims_estimand_pos == 3,      "Baseline mode can be used only with n_dim = 3"
@@ -195,7 +195,7 @@ class OnlineMultidimPhaseEstimator_v2:
             idxs_part_2 = np.arange(0, idxs_end_part_2)
             idxs_loop_for_search = np.concatenate((idxs_part_1, idxs_part_2))
             loop_for_search = self.latest_pos_loop[idxs_loop_for_search]
-        if self.is_violated_assumption_two:
+        if self.is_use_elapsed_time:
             idx_min_distance = compute_idx_min_distance_time(pos_signal = loop_for_search[:, 0:self.n_dims].copy(),
                                                              vel_signal = loop_for_search[:, self.n_dims:].copy(),
                                                              curr_pos   = curr_kinematics[0:self.n_dims],
@@ -277,11 +277,11 @@ def compute_loop_with_autocorrelation(self, pos_signal, vel_signal, local_time_v
     lower_bound_acceptable_peaks_values = max(peaks_values) - (max(peaks_values) * threshold_acceptable_peaks_wrt_maximum_pcent / 100)
     idxs_possible_period = np.where(peaks_values > lower_bound_acceptable_peaks_values)[0]  # indexing necessary because np.where returns a tuple containing an array
     idx_start_loop = 0
-    idx_end_loop = peaks[idxs_possible_period][0]
+    idx_stop_loop = peaks[idxs_possible_period][0]
 
-    pos_loop = pos_signal_stacked[idx_start_loop:idx_end_loop, :]
-    vel_loop = vel_signal_stacked[idx_start_loop:idx_end_loop, :]
-    self.loop_end_time = idx_end_loop
+    pos_loop = pos_signal_stacked[idx_start_loop:idx_stop_loop, :]
+    vel_loop = vel_signal_stacked[idx_start_loop:idx_stop_loop, :]
+    self.idx_end_loop = idx_stop_loop - 1
     return np.column_stack((pos_loop, vel_loop))
 
 
@@ -314,8 +314,8 @@ def compute_idx_min_distance_time(pos_signal, vel_signal, curr_pos, curr_vel, cu
     distances_vel = np.sqrt(np.sum((vel_signal - curr_vel) ** 2, axis=1))
     distances_pos = distances_pos / max(distances_pos, default=1)  
     distances_vel = distances_vel / max(distances_vel, default=1)
-    distances_idx_no_shift = np.abs(idxs_vec - (curr_idx - 1))
-    distances_idx_shift = np.abs(idxs_vec + len_latest_loop - (curr_idx - 1))
+    distances_idx_no_shift = np.abs(idxs_vec - (curr_idx))
+    distances_idx_shift = np.abs(idxs_vec + len_latest_loop - (curr_idx))
     distances_idx = np.minimum(distances_idx_no_shift, distances_idx_shift)
     distances_idx = distances_idx/ max(distances_idx, default=1)
     return np.argmin(distances_pos + distances_vel + distances_idx)
