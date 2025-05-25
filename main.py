@@ -17,6 +17,7 @@ look_behind_pcent = 5      # % of last completed loop before last nearest point 
 look_ahead_pcent  = 15     # % of last completed loop after last nearest point on which estimate the new phase
 
 is_use_baseline = False  # True: tethered mode; False: untethered mode
+is_use_elapsed_time = False
 
 time_const_lowpass_filter_phase        = 0.1    # [s]. Use None to disable. Must be larger than time step
 time_const_lowpass_filter_estimand_pos = 0.01
@@ -26,21 +27,25 @@ time_const_lowpass_filter_estimand_pos = 0.01
 #-------------------------------------------------
 # Can overwrite default parameters
 
-from setup_params.san_giovanni_2024_10_10 import *
+# from setup_params.san_giovanni_2024_10_10 import *
 # from setup_params.montpellier_2025_01_17 import *
 # from setup_params.dfki_2025_03_25 import *
 # from setup_params.cyens_2025_04_23 import *
+from setup_params.cyens_2025_05_28_Ex2 import *
+# from setup_params.cyens_2025_05_28_Ex3 import *
 
 
 # Load data
 # ------------------------------------------------
 df_estimand = pd.read_csv(file_path_estimand, skiprows=rows_to_skip_estimand, low_memory=False)
 df_estimand_pos = df_estimand[col_names_pos_estimand].copy()
+# df_estimand_pos = df_estimand[df_estimand.columns[1:]].copy()
 df_estimand_pos.ffill(inplace=True)
 estimand_pos_signal = np.array(df_estimand_pos)
 
 time_signal = np.arange(0, time_step * len(df_estimand_pos), time_step)
 
+# plt.plot(time_signal, df_estimand_pos); plt.show()
 
 def extract_points_from_df(df, col_names_points):
     col_names_points_flattened = []
@@ -65,6 +70,7 @@ else:
     baseline_pos_loop = None
     ref_frame_estimand_points = []
     ref_frame_baseline_points = []
+    time_step_baseline = None
 
 
 # Online estimator
@@ -78,14 +84,14 @@ phase_estimator = RecursiveOnlinePhaseEstimator(
     min_duration_first_pseudoperiod = min_duration_first_pseudoperiod,
     look_behind_pcent               = look_behind_pcent,
     look_ahead_pcent                = look_ahead_pcent,
-    time_const_lowpass_filter_pos = time_const_lowpass_filter_estimand_pos,
+    time_const_lowpass_filter_pos   = time_const_lowpass_filter_estimand_pos,
     time_const_lowpass_filter_phase = time_const_lowpass_filter_phase,
     is_use_baseline                 = is_use_baseline,
     baseline_pos_loop               = baseline_pos_loop,
     time_step_baseline              = time_step_baseline,
     ref_frame_estimand_points       = ref_frame_estimand_points,
     ref_frame_baseline_points       = ref_frame_baseline_points,
-    is_use_elapsed_time             = False,
+    is_use_elapsed_time             = is_use_elapsed_time,
 )
 phase_estimand_online = np.full(n_time_instants, None)
 for i_t in range(n_time_instants - 1):
@@ -108,8 +114,8 @@ phase_estimand_offline = wrap_to_2pi(phase_estimand_offline)
 print(f"Delimiter time instants: {phase_estimator.delimiter_time_instants}")
 
 plt.figure(figsize=(10, 5))
-plt.plot(time_signal[int((listening_time + discarded_time) / time_step) + 1:len(phase_estimand_offline) - 900], phase_estimand_offline[int((listening_time + discarded_time) / time_step) + 1:len(phase_estimand_offline) - 900], label='Phase offline')
-plt.plot(time_signal[int((listening_time + discarded_time) / time_step) + 1:len(phase_estimand_online) - 900], phase_estimand_online[  int((listening_time + discarded_time) / time_step) + 1:len(phase_estimand_online) - 900],  label='Phase online')
+plt.plot(time_signal[int((discarded_time) / time_step) + 1:len(phase_estimand_offline)], phase_estimand_offline[int((discarded_time) / time_step) + 1:len(phase_estimand_offline)], label='Phase offline')
+plt.plot(time_signal[int((discarded_time) / time_step) + 1:len(phase_estimand_online)], phase_estimand_online[  int((discarded_time) / time_step) + 1:len(phase_estimand_online)],  label='Phase online')
 plt.title('Comparison online-offline estimation', fontsize=16)
 plt.xlabel('Time (s)', fontsize=14)
 plt.ylabel('Phase (radians)', fontsize=14)
