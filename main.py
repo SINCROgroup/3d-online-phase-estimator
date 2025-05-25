@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from wrap_functions import wrap_to_2pi
+from find_closest_indices import find_closest_indices
 from RecursiveOnlinePhaseEstimator import RecursiveOnlinePhaseEstimator
 from compute_phase_via_pca_hilbert import compute_phase_via_pca_hilbert
 
@@ -111,11 +112,19 @@ phase_estimand_offline = wrap_to_2pi(phase_estimand_offline)
 
 # Figure
 # ------------------------------------------------
+delimiter_time_instants_idxs = find_closest_indices(time_signal, phase_estimator.delimiter_time_instants)
+
 print(f"Delimiter time instants: {phase_estimator.delimiter_time_instants}")
 
+first_period_to_show = 1
+last_period_to_show  = -1   # -1 to show all periods
+
+start_idx_plot = phase_estimator.idx_time_start_listening + delimiter_time_instants_idxs[first_period_to_show-1]
+stop_idx_plot  = phase_estimator.idx_time_start_listening + delimiter_time_instants_idxs[last_period_to_show]
+
 plt.figure(figsize=(10, 5))
-plt.plot(time_signal[int((discarded_time) / time_step) + 1:len(phase_estimand_offline)], phase_estimand_offline[int((discarded_time) / time_step) + 1:len(phase_estimand_offline)], label='Phase offline')
-plt.plot(time_signal[int((discarded_time) / time_step) + 1:len(phase_estimand_online)], phase_estimand_online[  int((discarded_time) / time_step) + 1:len(phase_estimand_online)],  label='Phase online')
+plt.plot(time_signal[start_idx_plot:stop_idx_plot], phase_estimand_offline[start_idx_plot:stop_idx_plot], label='Phase offline')
+plt.plot(time_signal[start_idx_plot:stop_idx_plot], phase_estimand_online[ start_idx_plot:stop_idx_plot],  label='Phase online')
 plt.title('Comparison online-offline estimation', fontsize=16)
 plt.xlabel('Time (s)', fontsize=14)
 plt.ylabel('Phase (radians)', fontsize=14)
