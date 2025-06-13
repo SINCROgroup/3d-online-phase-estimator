@@ -264,7 +264,7 @@ class RecursiveOnlinePhaseEstimator:
 # Helper functions
 ##################################################
 
-threshold_acceptable_peaks_wrt_maximum_pcent = 40  # Acceptance range of autocorrelation peaks defined as a percentage of the maximum autocorrelation value.
+threshold_acceptable_peaks_wrt_maximum_pcent = 20  # Acceptance range of autocorrelation peaks defined as a percentage of the maximum autocorrelation value.
 
 
 def compute_loop_with_autocorrelation(pos_signal, vel_signal, local_time_vec, min_duration_pseudoperiod) -> np.ndarray:
