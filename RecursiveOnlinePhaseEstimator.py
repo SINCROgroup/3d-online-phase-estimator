@@ -21,7 +21,7 @@ class RecursiveOnlinePhaseEstimator:
                  time_const_lowpass_filter_pos   = None,
                  is_use_baseline                 = False,
                  baseline_pos_loop               = None,
-                 time_step_baseline              = 0.01,
+                 baseline_time_signal            = None,
                  ref_frame_estimand_points       = None,
                  ref_frame_baseline_points       = None,
                  is_update_comparison_loop       = True,
@@ -40,7 +40,7 @@ class RecursiveOnlinePhaseEstimator:
         self.time_const_lowpass_filter_pos   = time_const_lowpass_filter_pos
         self.is_use_baseline                 = is_use_baseline
         self.min_duration_pseudoperiod       = min_duration_first_pseudoperiod # [s]
-        self.time_step_baseline              = time_step_baseline
+        self.baseline_time_signal            = baseline_time_signal
         self.is_update_comparison_loop       = is_update_comparison_loop       # True: update comparison loop when one is completed. False: the first loop is used as comparison loop and never updated
         self.is_use_elapsed_time             = is_use_elapsed_time   # True: also uses elapsed time to determine period completion
 
@@ -155,7 +155,7 @@ class RecursiveOnlinePhaseEstimator:
                             ref_frame_estimand_points = self.ref_frame_estimand_points,
                             baseline_pos_loop = self.baseline_pos_loop,
                             estimand_pos_loop = self.latest_loop,
-                            time_step_baseline = self.time_step_baseline,
+                            baseline_time_signal = self.baseline_time_signal,
                             initial_time_step_estimand = (self.local_time_signal[-1] - self.local_time_signal[-2])
                         )
 
@@ -257,7 +257,7 @@ def compute_phase_offset(ref_frame_baseline_points,
                             ref_frame_estimand_points,
                             baseline_pos_loop,
                             estimand_pos_loop,
-                            time_step_baseline,
+                            baseline_time_signal,
                             initial_time_step_estimand,
                             ) -> None:
     # Rotate baseline loop from global to ego frame
@@ -285,7 +285,7 @@ def compute_phase_offset(ref_frame_baseline_points,
 
     curr_pos_ = scaled_rotated_centered_loop[0, :]
     curr_vel_ = (scaled_rotated_centered_loop[1, :] - scaled_rotated_centered_loop[0, :]) / initial_time_step_estimand
-    baseline_vel_loop = np.gradient(baseline_pos_loop, np.arange(0, len(baseline_pos_loop) * time_step_baseline, time_step_baseline), axis=0)
+    baseline_vel_loop = np.gradient(baseline_pos_loop, baseline_time_signal, axis=0)
     index = compute_idx_min_distance(pos_signal = baseline_pos_loop.copy(),
                                         vel_signal = baseline_vel_loop.copy(),
                                         curr_pos   = curr_pos_,

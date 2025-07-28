@@ -71,6 +71,7 @@ def extract_points_from_df(df, col_names_points):
 if is_use_baseline:
     df_baseline       = pd.read_csv(file_path_baseline)
     baseline_pos_loop = np.array(df_baseline[col_names_pos_baseline])
+    baseline_time_signal = np.arange(0, time_step_baseline * len(baseline_pos_loop), time_step_baseline)
 
     ref_frame_estimand_points = extract_points_from_df(df_estimand, col_names_ref_frame_estimand_points)
     ref_frame_baseline_points = extract_points_from_df(df_baseline, col_names_ref_frame_baseline_points)
@@ -96,7 +97,7 @@ phase_estimator = RecursiveOnlinePhaseEstimator(
     time_const_lowpass_filter_phase = time_const_lowpass_filter_phase,
     is_use_baseline                 = is_use_baseline,
     baseline_pos_loop               = baseline_pos_loop,
-    time_step_baseline              = time_step_baseline,
+    baseline_time_signal            = baseline_time_signal,
     ref_frame_estimand_points       = ref_frame_estimand_points,
     ref_frame_baseline_points       = ref_frame_baseline_points,
     is_update_comparison_loop       = is_update_comparison_loop,
