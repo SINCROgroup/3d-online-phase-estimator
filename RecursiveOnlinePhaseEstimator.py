@@ -24,6 +24,7 @@ class RecursiveOnlinePhaseEstimator:
                  time_step_baseline              = 0.01,
                  ref_frame_estimand_points       = None,
                  ref_frame_baseline_points       = None,
+                 is_update_comparison_loop       = True,
                  is_use_elapsed_time             = False):
 
         self.is_first_loop_estimated = False
@@ -38,8 +39,9 @@ class RecursiveOnlinePhaseEstimator:
         self.time_const_lowpass_filter_phase = time_const_lowpass_filter_phase
         self.time_const_lowpass_filter_pos   = time_const_lowpass_filter_pos
         self.is_use_baseline                 = is_use_baseline
-        self.min_duration_pseudoperiod        = min_duration_first_pseudoperiod # [s]
+        self.min_duration_pseudoperiod       = min_duration_first_pseudoperiod # [s]
         self.time_step_baseline              = time_step_baseline
+        self.is_update_comparison_loop       = is_update_comparison_loop       # True: update comparison loop when one is completed. False: the first loop is used as comparison loop and never updated
         self.is_use_elapsed_time             = is_use_elapsed_time   # True: also uses elapsed time to determine period completion
 
         if is_use_baseline:
@@ -186,8 +188,9 @@ class RecursiveOnlinePhaseEstimator:
             if self.local_phase_signal[-1] - self.local_phase_signal[-2] < - self.phase_jump_for_loop_detection:   # a pseudoperiodicity window ended
                 self.delimiter_time_instants.append(float(curr_external_time))
                 self.delimiter_idxs.append(curr_idx)
-                self.latest_loop = np.vstack(self.new_loop)
-                self.update_look_ranges()
+                if self.is_update_comparison_loop:
+                    self.latest_loop = np.vstack(self.new_loop)
+                    self.update_look_ranges()
                 self.new_loop = []         # reinitialize new_loop
                 self.idx_curr_phase_in_latest_loop = 0
 
@@ -212,15 +215,20 @@ class RecursiveOnlinePhaseEstimator:
                                                         curr_pos   = curr_kinematics[0:self.n_dims],
                                                         curr_vel   = curr_kinematics[self.n_dims:])
         else:
-            latest_loop_time = np.array(self.local_time_signal[self.delimiter_idxs[-2]:self.delimiter_idxs[-1]]) - self.local_time_signal[self.delimiter_idxs[-2]]
+            if self.is_update_comparison_loop:
+                latest_loop_time = np.array(self.local_time_signal[self.delimiter_idxs[-2]:self.delimiter_idxs[-1]]) - self.local_time_signal[self.delimiter_idxs[-2]]
+                duration_latest_loop = self.delimiter_time_instants[-1] - self.delimiter_time_instants[-2]
+            else: 
+                latest_loop_time = np.array(self.local_time_signal[self.delimiter_idxs[0]:self.delimiter_idxs[1]]) - self.local_time_signal[self.delimiter_idxs[0]]
+                duration_latest_loop = self.delimiter_time_instants[1] - self.delimiter_time_instants[0]
             time_loop_for_search = latest_loop_time[idxs_loop_for_search]
             idx_min_distance = compute_idx_min_distance_with_time(pos_signal           = loop_for_search[:, 0:self.n_dims].copy(),
                                                                   vel_signal           = loop_for_search[:, self.n_dims:].copy(),
                                                                   curr_pos             = curr_kinematics[0:self.n_dims],
                                                                   curr_vel             = curr_kinematics[self.n_dims:],
                                                                   curr_elapsed_time    = curr_external_time - self.delimiter_time_instants[-1],
-                                                                  elapsed_time_signal= time_loop_for_search,
-                                                                  duration_latest_loop = self.delimiter_time_instants[-1] - self.delimiter_time_instants[-2])
+                                                                  elapsed_time_signal  = time_loop_for_search,
+                                                                  duration_latest_loop = duration_latest_loop)
         self.idx_curr_phase_in_latest_loop = idxs_loop_for_search[idx_min_distance]
         self.local_phase_signal.append((2 * np.pi * self.idx_curr_phase_in_latest_loop) / len_latest_loop)
         if self.is_use_lowpass_filter_phase:

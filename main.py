@@ -32,8 +32,15 @@ time_const_lowpass_filter_estimand_pos = 0.01
 # from setup_params.montpellier_2025_01_17 import *
 # from setup_params.dfki_2025_03_25 import *
 # from setup_params.cyens_2025_04_23 import *
-from setup_params.cyens_2025_05_28_Ex2 import *
-# from setup_params.cyens_2025_05_28_Ex3 import *
+# from setup_params.cyens_2025_05_08_Ex2 import *
+# from setup_params.cyens_2025_05_08_Ex3 import *
+# from setup_params.ideal_oscillator import *
+# from setup_params.tests_unreal_2025_06_11 import *
+# from setup_params.tests_unreal_2025_06_27 import *
+from setup_params.dfki_2025_05_23_Ex02 import *
+# from setup_params.dfki_2025_05_23_Ex03 import *
+# from setup_params.dfki_2025_05_23_Ex02_repeated_baseline import *
+# from setup_params.dfki_2025_05_23_Ex03_repeated_baseline import *
 
 
 # Load data
@@ -45,6 +52,7 @@ df_estimand_pos.ffill(inplace=True)
 estimand_pos_signal = np.array(df_estimand_pos)
 
 time_signal = np.arange(0, time_step * len(df_estimand_pos), time_step)
+# time_signal = df_estimand["time"].values
 
 # plt.plot(time_signal, df_estimand_pos); plt.show()
 
@@ -92,6 +100,7 @@ phase_estimator = RecursiveOnlinePhaseEstimator(
     time_step_baseline              = time_step_baseline,
     ref_frame_estimand_points       = ref_frame_estimand_points,
     ref_frame_baseline_points       = ref_frame_baseline_points,
+    is_update_comparison_loop       = is_update_comparison_loop,
     is_use_elapsed_time             = is_use_elapsed_time,
 )
 phase_estimand_online = np.full(n_time_instants, None)
@@ -120,7 +129,8 @@ first_period_to_show = 1
 last_period_to_show  = -1   # -1 to show all periods
 
 start_idx_plot = phase_estimator.idx_time_start_listening + delimiter_time_instants_idxs[first_period_to_show-1]
-stop_idx_plot  = phase_estimator.idx_time_start_listening + delimiter_time_instants_idxs[last_period_to_show]
+# stop_idx_plot  = phase_estimator.idx_time_start_listening + delimiter_time_instants_idxs[last_period_to_show]
+stop_idx_plot = len(time_signal)
 
 plt.figure(figsize=(10, 5))
 plt.plot(time_signal[start_idx_plot:stop_idx_plot], phase_estimand_offline[start_idx_plot:stop_idx_plot], label='Phase offline')
