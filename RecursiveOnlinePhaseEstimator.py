@@ -5,6 +5,12 @@ import matplotlib.pyplot as plt
 from low_pass_filters import LowPassFilter, LowPassFilterPhase
 
 
+# Note: this is for retrocompatibility. If true, will only use first 3
+# dimensions of estimand_pos_loop for phase offset computation.
+# Use true with san_giovanni_2024_10_10 data.
+is_legacy_phase_offset_computation = True
+
+
 ##################################################
 # Estimator class
 ##################################################
@@ -45,7 +51,6 @@ class RecursiveOnlinePhaseEstimator:
         self.is_use_elapsed_time             = is_use_elapsed_time   # True: also uses elapsed time to determine period completion
 
         if is_use_baseline:
-            assert n_dims_estimand_pos == 3,      "Baseline mode can be used only with n_dim = 3"
             assert baseline_pos_loop is not None, "Baseline mode was required but baseline_pos_loop was not provided"
             assert ref_frame_estimand_points is not None, "Baseline mode was required but ref_frame_points was not provided"
 
@@ -137,10 +142,10 @@ class RecursiveOnlinePhaseEstimator:
 
                 if not self.is_first_loop_estimated:
                     self.latest_loop = compute_loop_with_autocorrelation(
-                        pos_signal=self.pos_signal,
-                        vel_signal=self.vel_signal,
-                        local_time_vec=self.local_time_signal,
-                        min_duration_pseudoperiod=self.min_duration_pseudoperiod)
+                        pos_signal                = self.pos_signal,
+                        vel_signal                = self.vel_signal,
+                        local_time_vec            = self.local_time_signal,
+                        min_duration_pseudoperiod = self.min_duration_pseudoperiod)
                     self.update_look_ranges()
 
                     self.delimiter_time_instants.append(float(self.local_time_signal[self.idx_time_start_listening] + self.time_estimator_started))
@@ -150,13 +155,15 @@ class RecursiveOnlinePhaseEstimator:
                     self.is_first_loop_estimated = True
 
                     if self.is_use_baseline:
-                        self.phase_offset = compute_phase_offset(
-                            ref_frame_baseline_points = self.ref_frame_baseline_points,
-                            ref_frame_estimand_points = self.ref_frame_estimand_points,
-                            baseline_pos_loop = self.baseline_pos_loop,
-                            estimand_pos_loop = self.latest_loop,
-                            baseline_time_signal = self.baseline_time_signal,
-                            initial_time_step_estimand = (self.local_time_signal[-1] - self.local_time_signal[-2])
+                        if is_legacy_phase_offset_computation:  n_dof_offset_phase_computation = 3
+                        else:  n_dof_offset_phase_computation = self.latest_loop.shape[1]
+                        self.phase_offset = compute_phase_offset_3d(
+                            ref_frame_baseline_points  = self.ref_frame_baseline_points,
+                            ref_frame_estimand_points  = self.ref_frame_estimand_points,
+                            baseline_pos_loop          = self.baseline_pos_loop,
+                            estimand_pos_loop          = self.latest_loop[:, 0:n_dof_offset_phase_computation],
+                            baseline_time_signal       = self.baseline_time_signal,
+                            initial_time_step_estimand = (self.local_time_signal[self.delimiter_idxs[0]+1] - self.local_time_signal[self.delimiter_idxs[0]])
                         )
 
                     # Compute phases in first loop
@@ -253,18 +260,30 @@ class RecursiveOnlinePhaseEstimator:
 threshold_acceptable_peaks_wrt_maximum_pcent = 20  # Acceptance range of autocorrelation peaks defined as a percentage of the maximum autocorrelation value.
 
 
-def compute_phase_offset(ref_frame_baseline_points,
+def compute_phase_offset_3d(ref_frame_baseline_points,
                             ref_frame_estimand_points,
                             baseline_pos_loop,
                             estimand_pos_loop,
                             baseline_time_signal,
                             initial_time_step_estimand,
                             ) -> None:
+    # NB: check is_legacy_phase_offset_computation if you get error
+
+    assert len(ref_frame_baseline_points) == 3, "ref_frame_baseline_points must contain 3 points"
+    assert len(ref_frame_estimand_points) == 3, "ref_frame_estimand_points must contain 3 points"
+    assert np.shape(baseline_pos_loop)[1] % 3 == 0, "baseline_pos_loop must contain points in 3d space (unexpected array shape)"
+    assert np.shape(estimand_pos_loop)[1] % 3 == 0, "estimand_pos_loop must contain points in 3d space (unexpected array shape)"
+    assert np.shape(baseline_pos_loop)[1] == np.shape(estimand_pos_loop)[1], "baseline_pos_loop and estimand_pos_loop must have the same number of points"
+    assert len(baseline_time_signal) == np.shape(baseline_pos_loop)[0], "baseline_time_signal must have the same length as baseline_pos_loop"
+
+    n_dof = int(np.shape(baseline_pos_loop)[1] / 3)
+
     # Rotate baseline loop from global to ego frame
     x_axis_baseline, y_axis_baseline, z_axis_baseline = calculate_axes(ref_frame_baseline_points)
     rotat_matrix_global_to_ego_baseline = np.vstack([x_axis_baseline, y_axis_baseline, z_axis_baseline]).T
-    baseline_pos_loop =  baseline_pos_loop[:, 0:3] @ rotat_matrix_global_to_ego_baseline
-    
+    for i_dof in range(n_dof):
+        baseline_pos_loop[:, i_dof*3:(i_dof+1)*3] =  baseline_pos_loop[:, i_dof*3:(i_dof+1)*3] @ rotat_matrix_global_to_ego_baseline
+
     # Center baseline loop
     centroid_baseline = np.mean(baseline_pos_loop, axis=0)
     baseline_pos_loop = baseline_pos_loop - centroid_baseline
@@ -272,8 +291,10 @@ def compute_phase_offset(ref_frame_baseline_points,
     # Rotate latest loop from global to ego frame
     x_axis_estimand, y_axis_estimand, z_axis_estimand = calculate_axes(ref_frame_estimand_points)
     rotat_matrix_global_to_ego_estimand = np.vstack([x_axis_estimand, y_axis_estimand, z_axis_estimand]).T
-    rotated_loop = estimand_pos_loop[:, 0:3] @ rotat_matrix_global_to_ego_estimand
-    
+    rotated_loop = estimand_pos_loop.copy()
+    for i_dof in range(n_dof):
+        rotated_loop[:, i_dof*3:(i_dof+1)*3] = estimand_pos_loop[:, i_dof*3:(i_dof+1)*3] @ rotat_matrix_global_to_ego_estimand
+
     # Center latest loop
     centroid_estimand = np.mean(rotated_loop, axis=0)
     rotated_centered_loop = rotated_loop - centroid_estimand
