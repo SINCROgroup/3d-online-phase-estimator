@@ -28,7 +28,7 @@ time_const_lowpass_filter_estimand_pos = 0.01
 #-------------------------------------------------
 # Can overwrite default parameters
 
-from setup_params.san_giovanni_2024_10_10 import *
+# from setup_params.san_giovanni_2024_10_10 import *
 # from setup_params.montpellier_2025_01_17 import *
 # from setup_params.dfki_2025_03_25 import *
 # from setup_params.cyens_2025_04_23 import *
@@ -37,7 +37,7 @@ from setup_params.san_giovanni_2024_10_10 import *
 # from setup_params.ideal_oscillator import *
 # from setup_params.tests_unreal_2025_06_11 import *
 # from setup_params.tests_unreal_2025_06_27 import *
-# from setup_params.dfki_2025_05_23_Ex02 import *
+from setup_params.dfki_2025_05_23_Ex02 import *
 # from setup_params.dfki_2025_05_23_Ex03 import *
 # from setup_params.dfki_2025_05_23_Ex02_repeated_baseline import *
 # from setup_params.dfki_2025_05_23_Ex03_repeated_baseline import *
@@ -76,10 +76,10 @@ if is_use_baseline:
     ref_frame_estimand_points = extract_points_from_df(df_estimand, col_names_ref_frame_estimand_points)
     ref_frame_baseline_points = extract_points_from_df(df_baseline, col_names_ref_frame_baseline_points)
 else:
-    baseline_pos_loop = None
+    baseline_pos_loop         = None
     ref_frame_estimand_points = []
     ref_frame_baseline_points = []
-    time_step_baseline = None
+    baseline_time_signal      = None
 
 
 # Online estimator
