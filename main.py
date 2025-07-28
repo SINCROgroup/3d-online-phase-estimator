@@ -28,7 +28,7 @@ time_const_lowpass_filter_estimand_pos = 0.01
 #-------------------------------------------------
 # Can overwrite default parameters
 
-# from setup_params.san_giovanni_2024_10_10 import *
+from setup_params.san_giovanni_2024_10_10 import *
 # from setup_params.montpellier_2025_01_17 import *
 # from setup_params.dfki_2025_03_25 import *
 # from setup_params.cyens_2025_04_23 import *
@@ -37,7 +37,7 @@ time_const_lowpass_filter_estimand_pos = 0.01
 # from setup_params.ideal_oscillator import *
 # from setup_params.tests_unreal_2025_06_11 import *
 # from setup_params.tests_unreal_2025_06_27 import *
-from setup_params.dfki_2025_05_23_Ex02 import *
+# from setup_params.dfki_2025_05_23_Ex02 import *
 # from setup_params.dfki_2025_05_23_Ex03 import *
 # from setup_params.dfki_2025_05_23_Ex02_repeated_baseline import *
 # from setup_params.dfki_2025_05_23_Ex03_repeated_baseline import *
@@ -46,8 +46,8 @@ from setup_params.dfki_2025_05_23_Ex02 import *
 # Load data
 # ------------------------------------------------
 df_estimand = pd.read_csv(file_path_estimand, skiprows=rows_to_skip_estimand, low_memory=False)
+# col_names_pos_estimand = df_estimand.columns[1:] % to get all columns except the first one
 df_estimand_pos = df_estimand[col_names_pos_estimand].copy()
-# df_estimand_pos = df_estimand[df_estimand.columns[1:]].copy()
 df_estimand_pos.ffill(inplace=True)
 estimand_pos_signal = np.array(df_estimand_pos)
 
@@ -69,12 +69,11 @@ def extract_points_from_df(df, col_names_points):
     return points
 
 if is_use_baseline:
-    ref_frame_estimand_points = extract_points_from_df(df_estimand, col_names_ref_frame_estimand_points)
-
     df_baseline       = pd.read_csv(file_path_baseline)
     baseline_pos_loop = np.array(df_baseline[col_names_pos_baseline])
-    ref_frame_baseline_points = extract_points_from_df(df_baseline, col_names_ref_frame_baseline_points)  # TODO edit point. path B
-    # ref_frame_baseline_points = ref_frame_estimand_points.copy()                                            # TODO edit point. path A
+
+    ref_frame_estimand_points = extract_points_from_df(df_estimand, col_names_ref_frame_estimand_points)
+    ref_frame_baseline_points = extract_points_from_df(df_baseline, col_names_ref_frame_baseline_points)
 else:
     baseline_pos_loop = None
     ref_frame_estimand_points = []

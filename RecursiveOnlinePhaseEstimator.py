@@ -14,7 +14,7 @@ class RecursiveOnlinePhaseEstimator:
                  n_dims_estimand_pos: int,
                  listening_time,
                  discarded_time                  = 0,
-                 min_duration_first_pseudoperiod  = 1,
+                 min_duration_first_pseudoperiod = 1,
                  look_behind_pcent               = 0,
                  look_ahead_pcent                = 10,
                  time_const_lowpass_filter_phase = None,
@@ -149,7 +149,15 @@ class RecursiveOnlinePhaseEstimator:
                     self.delimiter_idxs.append(len(self.latest_loop))
                     self.is_first_loop_estimated = True
 
-                    if self.is_use_baseline:  self.compute_phase_offset()
+                    if self.is_use_baseline:
+                        self.phase_offset = compute_phase_offset(
+                            ref_frame_baseline_points = self.ref_frame_baseline_points,
+                            ref_frame_estimand_points = self.ref_frame_estimand_points,
+                            baseline_pos_loop = self.baseline_pos_loop,
+                            estimand_pos_loop = self.latest_loop,
+                            time_step_baseline = self.time_step_baseline,
+                            initial_time_step_estimand = (self.local_time_signal[-1] - self.local_time_signal[-2])
+                        )
 
                     # Compute phases in first loop
                     local_phases_first_loop  = np.linspace(0, 2 * np.pi, len(self.latest_loop))
@@ -237,42 +245,52 @@ class RecursiveOnlinePhaseEstimator:
         self.global_phase_signal.append(np.mod(self.local_phase_signal[-1] + self.phase_offset, 2 * np.pi))
 
 
-    def compute_phase_offset(self) -> None:
-        # TODO edit point. path A: comment next five lines. path B: uncoment
-        x_axis_baseline, y_axis_baseline, z_axis_baseline = calculate_axes(self.ref_frame_baseline_points)
-        rotat_matrix_global_to_ego_baseline = np.vstack([x_axis_baseline, y_axis_baseline, z_axis_baseline]).T
-        self.baseline_pos_loop =  self.baseline_pos_loop[:, 0:3] @ rotat_matrix_global_to_ego_baseline
-        centroid_baseline = np.mean(self.baseline_pos_loop, axis=0)
-        self.baseline_pos_loop = self.baseline_pos_loop - centroid_baseline
-
-        x_axis_estimand, y_axis_estimand, z_axis_estimand = calculate_axes(self.ref_frame_estimand_points)
-        rotat_matrix_global_to_ego_estimand = np.vstack([x_axis_estimand, y_axis_estimand, z_axis_estimand]).T
-        rotated_loop = self.latest_loop[:, 0:3] @ rotat_matrix_global_to_ego_estimand
-
-        centroid_estimand = np.mean(rotated_loop, axis=0)
-        rotated_centered_loop = rotated_loop - centroid_estimand
-
-        scale_factors = np.std(self.baseline_pos_loop, axis=0) / np.std(rotated_centered_loop, axis=0)
-        scale_factors[np.isnan(scale_factors)] = 1
-        scaled_rotated_centered_loop = rotated_centered_loop * scale_factors
-
-        curr_pos_ = scaled_rotated_centered_loop[0, :]
-        curr_step_time = self.local_time_signal[-1] - self.local_time_signal[-2]
-        curr_vel_ = (scaled_rotated_centered_loop[1, :] - scaled_rotated_centered_loop[0, :]) / curr_step_time
-        baseline_vel_loop = np.gradient(self.baseline_pos_loop, np.arange(0, len(self.baseline_pos_loop) * self.time_step_baseline, self.time_step_baseline), axis=0)
-        index = compute_idx_min_distance(pos_signal = self.baseline_pos_loop.copy(),
-                                         vel_signal = baseline_vel_loop.copy(),
-                                         curr_pos   = curr_pos_,
-                                         curr_vel   = curr_vel_)
-        self.phase_offset = (2 * np.pi * index) / len(self.baseline_pos_loop)
-
-
 
 ##################################################
 # Helper functions
 ##################################################
 
 threshold_acceptable_peaks_wrt_maximum_pcent = 20  # Acceptance range of autocorrelation peaks defined as a percentage of the maximum autocorrelation value.
+
+
+def compute_phase_offset(ref_frame_baseline_points,
+                            ref_frame_estimand_points,
+                            baseline_pos_loop,
+                            estimand_pos_loop,
+                            time_step_baseline,
+                            initial_time_step_estimand,
+                            ) -> None:
+    # Rotate baseline loop from global to ego frame
+    x_axis_baseline, y_axis_baseline, z_axis_baseline = calculate_axes(ref_frame_baseline_points)
+    rotat_matrix_global_to_ego_baseline = np.vstack([x_axis_baseline, y_axis_baseline, z_axis_baseline]).T
+    baseline_pos_loop =  baseline_pos_loop[:, 0:3] @ rotat_matrix_global_to_ego_baseline
+    
+    # Center baseline loop
+    centroid_baseline = np.mean(baseline_pos_loop, axis=0)
+    baseline_pos_loop = baseline_pos_loop - centroid_baseline
+
+    # Rotate latest loop from global to ego frame
+    x_axis_estimand, y_axis_estimand, z_axis_estimand = calculate_axes(ref_frame_estimand_points)
+    rotat_matrix_global_to_ego_estimand = np.vstack([x_axis_estimand, y_axis_estimand, z_axis_estimand]).T
+    rotated_loop = estimand_pos_loop[:, 0:3] @ rotat_matrix_global_to_ego_estimand
+    
+    # Center latest loop
+    centroid_estimand = np.mean(rotated_loop, axis=0)
+    rotated_centered_loop = rotated_loop - centroid_estimand
+    
+    # Scale latest loop to baseline loop
+    scale_factors = np.std(baseline_pos_loop, axis=0) / np.std(rotated_centered_loop, axis=0)
+    scale_factors[np.isnan(scale_factors)] = 1
+    scaled_rotated_centered_loop = rotated_centered_loop * scale_factors
+
+    curr_pos_ = scaled_rotated_centered_loop[0, :]
+    curr_vel_ = (scaled_rotated_centered_loop[1, :] - scaled_rotated_centered_loop[0, :]) / initial_time_step_estimand
+    baseline_vel_loop = np.gradient(baseline_pos_loop, np.arange(0, len(baseline_pos_loop) * time_step_baseline, time_step_baseline), axis=0)
+    index = compute_idx_min_distance(pos_signal = baseline_pos_loop.copy(),
+                                        vel_signal = baseline_vel_loop.copy(),
+                                        curr_pos   = curr_pos_,
+                                        curr_vel   = curr_vel_)
+    return (2 * np.pi * index) / len(baseline_pos_loop)
 
 
 def compute_loop_with_autocorrelation(pos_signal, vel_signal, local_time_vec, min_duration_pseudoperiod) -> np.ndarray:
