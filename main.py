@@ -37,8 +37,8 @@ time_const_lowpass_filter_estimand_pos = 0.01
 # from setup_params.ideal_oscillator import *
 # from setup_params.tests_unreal_2025_06_11 import *
 # from setup_params.tests_unreal_2025_06_27 import *
-from setup_params.dfki_2025_05_23_Ex02 import *
-# from setup_params.dfki_2025_05_23_Ex03 import *
+# from setup_params.dfki_2025_05_23_Ex02 import *
+from setup_params.dfki_2025_05_23_Ex03 import *
 # from setup_params.dfki_2025_05_23_Ex02_repeated_baseline import *
 # from setup_params.dfki_2025_05_23_Ex03_repeated_baseline import *
 
@@ -51,8 +51,8 @@ df_estimand_pos = df_estimand[col_names_pos_estimand].copy()
 df_estimand_pos.ffill(inplace=True)
 estimand_pos_signal = np.array(df_estimand_pos)
 
-time_signal = np.arange(0, time_step * len(df_estimand_pos), time_step)
-# time_signal = df_estimand["time"].values
+time_signal = np.arange(0, time_step * len(df_estimand_pos), time_step)  # NOTE should be changed depending on the data
+# time_signal = df_estimand["Time"].values
 
 # plt.plot(time_signal, df_estimand_pos); plt.show()
 
@@ -71,10 +71,18 @@ def extract_points_from_df(df, col_names_points):
 if is_use_baseline:
     df_baseline       = pd.read_csv(file_path_baseline)
     baseline_pos_loop = np.array(df_baseline[col_names_pos_baseline])
+
+    # NOTE should be changed depending on the data
     baseline_time_signal = np.arange(0, time_step_baseline * len(baseline_pos_loop), time_step_baseline)
 
-    ref_frame_estimand_points = extract_points_from_df(df_estimand, col_names_ref_frame_estimand_points)
-    ref_frame_baseline_points = extract_points_from_df(df_baseline, col_names_ref_frame_baseline_points)
+    # NOTE should be changed depending on the data
+    # When baseline and estimand signals are in the same reference frame, this does not apply ant rotation
+    ref_frame_estimand_points = [np.array([0, 0, 0]), np.array([1, 0, 0]), np.array([0, 0, 1])]
+    ref_frame_baseline_points = [np.array([0, 0, 0]), np.array([1, 0, 0]), np.array([0, 0, 1])]
+    #
+    # When baseline and estimand signals are in different reference frames
+    # ref_frame_estimand_points = extract_points_from_df(df_estimand, col_names_ref_frame_estimand_points)
+    # ref_frame_baseline_points = extract_points_from_df(df_baseline, col_names_ref_frame_baseline_points)
 else:
     baseline_pos_loop         = None
     ref_frame_estimand_points = []

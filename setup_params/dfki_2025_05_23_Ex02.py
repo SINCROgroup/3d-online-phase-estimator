@@ -14,6 +14,10 @@ rows_to_skip_estimand = list(range(0, 4))
 time_step = 1/30
 
 is_update_comparison_loop = True
-is_use_baseline = False;  time_step_baseline = None
 is_use_elapsed_time = False
 
+
+is_use_baseline = True
+file_path_baseline = r"data\dfki_mocap_excerises_2025-05-23\CSV\Ex02_baseline.csv"
+col_names_pos_baseline  = ["LWrist.X", "LWrist.Y", "LWrist.Z", "RWrist.X", "RWrist.Y", "RWrist.Z", "LHeel.X", "LHeel.Y", "LHeel.Z", "RHeel.X", "RHeel.Y", "RHeel.Z"]
+time_step_baseline = 1/30

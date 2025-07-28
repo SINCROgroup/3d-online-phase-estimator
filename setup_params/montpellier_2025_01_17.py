@@ -10,5 +10,6 @@ file_path_estimand = r"data\mocap_exercices_montpellier_2025-01-17\EX101_pelvic_
 rows_to_skip_estimand = list(range(0, 9))
 time_step             = 0.01
 
-is_use_baseline = False;
+is_use_baseline = False
+is_legacy_phase_offset_computation = True
 time_step_baseline = None

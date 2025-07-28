@@ -5,11 +5,6 @@ import matplotlib.pyplot as plt
 from low_pass_filters import LowPassFilter, LowPassFilterPhase
 
 
-# Note: this is for retrocompatibility. If true, will only use first 3
-# dimensions of estimand_pos_loop for phase offset computation.
-# Use true with san_giovanni_2024_10_10 data.
-is_legacy_phase_offset_computation = True
-
 
 ##################################################
 # Estimator class
@@ -155,8 +150,12 @@ class RecursiveOnlinePhaseEstimator:
                     self.is_first_loop_estimated = True
 
                     if self.is_use_baseline:
-                        if is_legacy_phase_offset_computation:  n_dof_offset_phase_computation = 3
-                        else:  n_dof_offset_phase_computation = self.latest_loop.shape[1]
+                        # Note: this is for backwards compatibility. If true, will only use first 1 degree of freedom
+                        # of estimand_pos_loop for phase offset computation, because in legacy datasets, baselines 
+                        # only had 1 degree of freedom. Use true with san_giovanni_2024_10_10 data.
+                        if 'is_legacy_phase_offset_computation' in globals() and is_legacy_phase_offset_computation:  n_dof_offset_phase_computation = 3
+                        else:  n_dof_offset_phase_computation = int(self.latest_loop.shape[1]/2)  # loop is pos and vel stacked; we only need pos here
+                        
                         self.phase_offset = compute_phase_offset_3d(
                             ref_frame_baseline_points  = self.ref_frame_baseline_points,
                             ref_frame_estimand_points  = self.ref_frame_estimand_points,
@@ -277,32 +276,49 @@ def compute_phase_offset_3d(ref_frame_baseline_points,
     assert len(baseline_time_signal) == np.shape(baseline_pos_loop)[0], "baseline_time_signal must have the same length as baseline_pos_loop"
 
     n_dof = int(np.shape(baseline_pos_loop)[1] / 3)
+    x_dims = np.arange(0, n_dof * 3, 3)  # x dimensions of all degrees of freedom
+    y_dims = np.arange(1, n_dof * 3, 3)  # y ...
+    z_dims = np.arange(2, n_dof * 3, 3)  # z ...
 
     # Rotate baseline loop from global to ego frame
     x_axis_baseline, y_axis_baseline, z_axis_baseline = calculate_axes(ref_frame_baseline_points)
     rotat_matrix_global_to_ego_baseline = np.vstack([x_axis_baseline, y_axis_baseline, z_axis_baseline]).T
-    for i_dof in range(n_dof):
+    for i_dof in range(n_dof):  # rotate each degree of freedom separately
         baseline_pos_loop[:, i_dof*3:(i_dof+1)*3] =  baseline_pos_loop[:, i_dof*3:(i_dof+1)*3] @ rotat_matrix_global_to_ego_baseline
 
     # Center baseline loop
-    centroid_baseline = np.mean(baseline_pos_loop, axis=0)
-    baseline_pos_loop = baseline_pos_loop - centroid_baseline
+    centroid_baseline = [ np.mean(baseline_pos_loop[:, x_dims]),   # mean is done both in time and on degrees of freedom
+                          np.mean(baseline_pos_loop[:, y_dims]),
+                          np.mean(baseline_pos_loop[:, z_dims])]
+    baseline_pos_loop[:, x_dims] = baseline_pos_loop[:, x_dims] - centroid_baseline[0]
+    baseline_pos_loop[:, y_dims] = baseline_pos_loop[:, y_dims] - centroid_baseline[1]
+    baseline_pos_loop[:, z_dims] = baseline_pos_loop[:, z_dims] - centroid_baseline[2]
 
-    # Rotate latest loop from global to ego frame
+    # Rotate estimand loop from global to ego frame
     x_axis_estimand, y_axis_estimand, z_axis_estimand = calculate_axes(ref_frame_estimand_points)
     rotat_matrix_global_to_ego_estimand = np.vstack([x_axis_estimand, y_axis_estimand, z_axis_estimand]).T
     rotated_loop = estimand_pos_loop.copy()
     for i_dof in range(n_dof):
         rotated_loop[:, i_dof*3:(i_dof+1)*3] = estimand_pos_loop[:, i_dof*3:(i_dof+1)*3] @ rotat_matrix_global_to_ego_estimand
 
-    # Center latest loop
-    centroid_estimand = np.mean(rotated_loop, axis=0)
-    rotated_centered_loop = rotated_loop - centroid_estimand
-    
-    # Scale latest loop to baseline loop
-    scale_factors = np.std(baseline_pos_loop, axis=0) / np.std(rotated_centered_loop, axis=0)
+    # Center estimand loop
+    rotated_centered_loop = rotated_loop.copy()
+    centroid_estimand = [ np.mean(rotated_loop[:, x_dims]),
+                          np.mean(rotated_loop[:, y_dims]),
+                          np.mean(rotated_loop[:, z_dims])]
+    rotated_centered_loop[:, x_dims] = rotated_loop[:, x_dims] - centroid_estimand[0]
+    rotated_centered_loop[:, y_dims] = rotated_loop[:, y_dims] - centroid_estimand[1]
+    rotated_centered_loop[:, z_dims] = rotated_loop[:, z_dims] - centroid_estimand[2]
+
+    # Scale estimand loop to baseline loop
+    scaled_rotated_centered_loop = rotated_centered_loop.copy()
+    scale_factors = np.array([ np.std(baseline_pos_loop[:, x_dims]) / np.std(rotated_centered_loop[:, x_dims]),   # all degrees of freedom are scaled with the same factor on the same space dimension (x, y, z)
+                               np.std(baseline_pos_loop[:, y_dims]) / np.std(rotated_centered_loop[:, y_dims]),
+                               np.std(baseline_pos_loop[:, z_dims]) / np.std(rotated_centered_loop[:, z_dims])])
     scale_factors[np.isnan(scale_factors)] = 1
-    scaled_rotated_centered_loop = rotated_centered_loop * scale_factors
+    scaled_rotated_centered_loop[:, x_dims] = rotated_centered_loop[:, x_dims] * scale_factors[0]
+    scaled_rotated_centered_loop[:, y_dims] = rotated_centered_loop[:, y_dims] * scale_factors[1]
+    scaled_rotated_centered_loop[:, z_dims] = rotated_centered_loop[:, z_dims] * scale_factors[2]
 
     curr_pos_ = scaled_rotated_centered_loop[0, :]
     curr_vel_ = (scaled_rotated_centered_loop[1, :] - scaled_rotated_centered_loop[0, :]) / initial_time_step_estimand
