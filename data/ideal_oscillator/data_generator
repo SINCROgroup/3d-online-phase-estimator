@@ -1,0 +1,41 @@
+import numpy as np
+import pandas as pd
+
+# Parameters
+t_max = 20  # Maximum time (seconds)
+omega = 4   # Angular frequency
+
+# Generate time array
+dt = 0.05  # Time increment
+t = np.arange(0, t_max + dt, dt)
+# Add small Gaussian noise to each time instant
+noise_std = 0.02  # Standard deviation of noise
+t = t + np.random.uniform(-noise_std, noise_std, size=t.shape)
+t[0] = 0  # Ensure the first time point is exactly zero
+
+# Generate sine waves
+col1 = np.zeros_like(t)
+col2 = np.sin(omega * t)
+col3 = np.cos(omega * t)
+
+# Create DataFrame
+data = {
+    'time': t,
+    'zeros': col1,
+    'sine': col2,
+    'cosine': col3
+}
+
+df = pd.DataFrame(data)
+
+# Save to CSV
+df.to_csv('sine_wave_data.csv', index=False)
+
+print(f"CSV file generated with {len(t)} data points")
+print(f"Time range: {t[0]:.4f} to {t[-1]:.4f} seconds")
+print(f"Time increment: {dt:.4f} seconds")
+print("File saved as 'sine_wave_data.csv'")
+
+# Display first few rows
+print("\nFirst 10 rows:")
+print(df.head(10))

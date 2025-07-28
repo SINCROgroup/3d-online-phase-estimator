@@ -6,6 +6,7 @@ rows_to_skip_estimand  = [0, 1, 2] + list(range(4, 40))
 col_names_pos_estimand = ['TX.3', 'TY.3', 'TZ.3']
 time_step              = 0.01  # [s]
 
+is_update_comparison_loop = True
 is_use_baseline = True
 time_step_baseline  = 0.01
 # file_path_baseline  = r"data\san_giovanni_2024-10-10\spiral_ref.csv"       # TODO edit point. path A

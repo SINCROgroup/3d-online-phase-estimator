@@ -1,0 +1,21 @@
+import pandas as pd
+import numpy as np
+import os
+
+# Step 1: Open the CSV
+input_file = 'Ex03_baseline.csv'  # Replace with your filename
+df = pd.read_csv(input_file)
+
+# Step 2: Generate equally spaced values from 0 to 2π (excluding 2π)
+num_rows = len(df)
+phase_values = np.linspace(0, 2 * np.pi, num_rows, endpoint=False)
+
+# Step 3: Insert the new "phase" column at the beginning
+df.insert(0, 'phase', phase_values)
+
+# Step 4: Save to new CSV with "_with_phase" added to the original filename
+base, ext = os.path.splitext(input_file)
+output_file = f"{base}_with_phase{ext}"
+df.to_csv(output_file, index=False)
+
+print(f"Modified CSV saved as: {output_file}")

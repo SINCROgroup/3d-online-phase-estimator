@@ -1,0 +1,2 @@
+﻿Baseline for exercise 2 is taken from Ex02_05.csv
+Baseline for exercise 3 is taken from Ex03_09.csv
