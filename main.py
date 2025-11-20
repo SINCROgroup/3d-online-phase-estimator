@@ -37,10 +37,11 @@ time_const_lowpass_filter_estimand_pos = 0.01
 # from setup_params.ideal_oscillator import *
 # from setup_params.tests_unreal_2025_06_11 import *
 # from setup_params.tests_unreal_2025_06_27 import *
-from setup_params.dfki_2025_05_23_Ex02 import *
+# from setup_params.dfki_2025_05_23_Ex02 import *
 # from setup_params.dfki_2025_05_23_Ex03 import *
 # from setup_params.dfki_2025_05_23_Ex02_repeated_baseline import *
 # from setup_params.dfki_2025_05_23_Ex03_repeated_baseline import *
+from setup_params.dfki_2025_10_15_SidePlank import *
 
 
 # Load data

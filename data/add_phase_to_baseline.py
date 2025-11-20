@@ -3,7 +3,7 @@ import numpy as np
 import os
 
 # Step 1: Open the CSV
-input_file = 'Ex03_baseline.csv'  # Replace with your filename
+input_file = '20251017_SidePlank_baseline.csv'  # Replace with your filename
 df = pd.read_csv(input_file)
 
 # Step 2: Generate equally spaced values from 0 to 2π (excluding 2π)
